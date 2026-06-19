@@ -143,6 +143,8 @@ export async function maybeLoadRobCo(app) {
             const teach = await TeachPendant.attach(app, model);
             window._robcoTeach = teach;
             window._robcoPanel = new RobFlowToolsPanel(app, { teach, client: null });
+            // Dragging the gizmo -> recompute the dynamics panel for the posed arm.
+            if (teach) teach.onPose = (deg) => window._robcoDynamics?.updateStatic?.(deg);
         } catch (e) {
             console.error('[RobCo] teach tools failed:', e);
         }

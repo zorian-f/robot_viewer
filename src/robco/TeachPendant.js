@@ -110,6 +110,7 @@ export class TeachPendant {
         const res = this.kin.solveIK([local.x, local.y, local.z], mat, this._currentQ());
         this._applyQ(res.q);
         this.onIk?.(res);
+        this.onPose?.(this.currentAnglesDeg()); // let the dynamics panel recompute for the new pose
     }
 
     /** Re-snap the gizmo to the current TCP (call from the live mirror when not teaching). */

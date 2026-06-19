@@ -70,6 +70,8 @@ export async function connectLiveSession(app, opts) {
             try {
                 teach = await TeachPendant.attach(app, model);
                 panel.setTeach(teach);
+                // While posing with the gizmo, the dynamics panel follows the previewed pose.
+                if (teach) teach.onPose = (deg) => dynamics?.updateStatic(deg);
             } catch (e) {
                 console.error('[RobCo] teach pendant failed:', e);
             }
@@ -83,7 +85,8 @@ export async function connectLiveSession(app, opts) {
         latestAngles = angles;
         // Pause the mirror while teaching so dragging isn't fought by incoming angles.
         if (model && !app._teachActive) applyAnglesDeg(model, angles);
-        if (dynamics) dynamics.update(angles, performance.now());
+        // While teaching, the dynamics panel follows the gizmo (updateStatic), not the stream.
+        if (dynamics && !app._teachActive) dynamics.update(angles, performance.now());
         if (teach) teach.syncTcp();
     });
 

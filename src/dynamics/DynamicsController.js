@@ -57,6 +57,20 @@ export class DynamicsController {
         this.dash.render({ angleDeg: anglesDeg, velocity, acceleration, torque, utilization });
     }
 
+    /**
+     * Recompute at a static pose (zero velocity/acceleration) — used while posing with the
+     * teach gizmo, so the panel shows the gravity + payload hold torque at that pose.
+     * @param {number[]} anglesDeg
+     */
+    updateStatic(anglesDeg) {
+        this._lastAngles = anglesDeg;
+        const qRad = anglesDeg.map((d) => d * DEG2RAD);
+        const zeros = qRad.map(() => 0);
+        const { torque, utilization } = this.dyn.computeTorques(qRad, zeros, zeros);
+        this.dash.render({ angleDeg: anglesDeg, velocity: zeros, acceleration: zeros, torque, utilization });
+        this.deriv.reset(); // so a later live stream doesn't differentiate across the manual pose
+    }
+
     /** @param {number} mass kg @param {number[]} com flange-frame CoM (m) */
     setPayload(mass, com = [0, 0, 0]) {
         this.dyn.setPayload(mass, com); // rebuilds the MuJoCo model with the load at the flange

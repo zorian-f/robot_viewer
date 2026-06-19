@@ -50,6 +50,10 @@ export async function connectLiveSession(app, opts) {
             console.log(
                 `[RobCo] live robot ready: ${model.links.size} links, ${model.joints.size} joints`,
             );
+            try {
+                const { enhanceVisuals } = await import('./enhanceVisuals.js');
+                await enhanceVisuals(model, app.sceneManager);
+            } catch (e) { console.warn('[RobCo] enhanceVisuals failed:', e); }
 
             // Live dynamics dashboard (torque/utilization each frame).
             try {

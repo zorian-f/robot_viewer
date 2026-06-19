@@ -118,6 +118,10 @@ export async function maybeLoadRobCo(app) {
             `[RobCo] loaded: ${model.links.size} links, ${model.joints.size} joints`,
             model.userData.jointOrder,
         );
+        try {
+            const { enhanceVisuals } = await import('./enhanceVisuals.js');
+            await enhanceVisuals(model, app.sceneManager);
+        } catch (e) { console.warn('[RobCo] enhanceVisuals failed:', e); }
 
         // Dynamics dashboard (static pose -> static gravity torques).
         try {

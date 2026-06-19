@@ -32,6 +32,23 @@ function parseIds(csv, fallback) {
     return csv.split(',').map((s) => s.trim()).filter(Boolean);
 }
 
+// Hide the original robot_viewer chrome (top bar, side panels, editor, etc.) so only the
+// 3D canvas + RobCo panels remain. `?chrome=1` keeps the original UI.
+function hideOriginalChrome() {
+    if (document.getElementById('robco-hide-chrome')) return;
+    const ids = [
+        'top-control-bar', 'floating-files-panel', 'floating-joints-panel',
+        'floating-model-tree', 'floating-help-panel', 'mujoco-simulation-bar',
+        'hover-info', 'drop-zone', 'bottom-help-bar', 'copyright-watermark',
+        'help-button', 'code-editor-panel', 'code-editor-wrapper',
+        'joints-panel', 'joint-controls-panel', 'graph-panel', 'model-graph-panel',
+    ];
+    const style = document.createElement('style');
+    style.id = 'robco-hide-chrome';
+    style.textContent = ids.map((id) => `#${id}`).join(',') + '{display:none !important;}';
+    document.head.appendChild(style);
+}
+
 function addConnectButton(app) {
     if (window._robcoConnectBtn) return;
     const btn = document.createElement('button');
@@ -50,6 +67,7 @@ function addConnectButton(app) {
 
 export async function maybeLoadRobCo(app) {
     const params = new URLSearchParams(location.search);
+    if (params.get('chrome') !== '1') hideOriginalChrome();
     addConnectButton(app);
     if (!params.has('robco')) return;
     const mode = params.get('robco');

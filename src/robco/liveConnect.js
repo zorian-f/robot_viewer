@@ -105,11 +105,15 @@ export async function connectLiveSession(app, opts) {
     });
 
     socket.on('payload', (p) => {
-        if (!p) return;
+        // Only apply a real robot payload (mass > 0). A zero/absent robot payload must NOT
+        // overwrite the user's manually-set TCP load (persisted in the dynamics panel and
+        // re-applied on attach) — otherwise every (re)connect wipes it and it has to be
+        // re-entered by hand after each reload.
+        if (!p || !(p.mass > 0)) return;
         // RobFlow payload: mass (kg) + centerOfMass. CoM assumed metres in the flange frame.
         const com = p.centerOfMass || [0, 0, 0];
-        if (dynamics) dynamics.setPayload(p.mass || 0, com);
-        else pendingPayload = { mass: p.mass || 0, com };
+        if (dynamics) dynamics.setPayload(p.mass, com);
+        else pendingPayload = { mass: p.mass, com };
     });
 
     socket.on('robotState', (d) => panel.setStates({ robotState: d }));

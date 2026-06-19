@@ -138,7 +138,7 @@ export class ViewPanel {
 
         document.body.appendChild(root);
         this.root = root;
-        makeDraggable(root, t);
+        makeDraggable(root, t, 'view');
     }
 
     // --- joint sliders (FK) --------------------------------------------

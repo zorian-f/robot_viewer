@@ -214,7 +214,7 @@ export class RobFlowToolsPanel {
 
         document.body.appendChild(root);
         this.root = root;
-        makeDraggable(root, title);
+        makeDraggable(root, title, 'tools');
         this._teachVisible(false);
     }
 

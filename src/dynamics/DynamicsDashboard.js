@@ -188,7 +188,7 @@ export class DynamicsDashboard {
 
         parent.appendChild(el);
         this.el = el;
-        makeDraggable(el, this._title);
+        makeDraggable(el, this._title, 'dynamics');
     }
 
     _buildSettings(container) {

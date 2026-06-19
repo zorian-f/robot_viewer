@@ -2,11 +2,51 @@
  * Make a fixed-positioned element draggable by a handle (e.g. its title bar).
  * Pins the element to left/top on first drag (clearing right/bottom) and clamps to the
  * viewport. Drags that start on an interactive control are ignored so buttons/sliders work.
+ *
+ * Pass a stable `key` to remember the panel's position across reloads (localStorage).
  */
-export function makeDraggable(el, handle) {
+const POS_PREFIX = 'robco-pos-';
+
+function loadPos(key) {
+    try {
+        const s = localStorage.getItem(POS_PREFIX + key);
+        return s ? JSON.parse(s) : null;
+    } catch {
+        return null;
+    }
+}
+
+function savePos(key, pos) {
+    try {
+        localStorage.setItem(POS_PREFIX + key, JSON.stringify(pos));
+    } catch {
+        /* storage unavailable */
+    }
+}
+
+function clampPos(left, top) {
+    return {
+        left: Math.max(0, Math.min(window.innerWidth - 40, left)),
+        top: Math.max(0, Math.min(window.innerHeight - 28, top)),
+    };
+}
+
+export function makeDraggable(el, handle, key) {
     handle.style.cursor = 'move';
     handle.style.userSelect = 'none';
     handle.style.touchAction = 'none';
+
+    // Restore a saved position (pins to left/top, clearing the CSS right/bottom anchor).
+    if (key) {
+        const saved = loadPos(key);
+        if (saved && typeof saved.left === 'number' && typeof saved.top === 'number') {
+            const { left, top } = clampPos(saved.left, saved.top);
+            el.style.left = `${left}px`;
+            el.style.top = `${top}px`;
+            el.style.right = 'auto';
+            el.style.bottom = 'auto';
+        }
+    }
 
     handle.addEventListener('pointerdown', (e) => {
         if (e.target.closest('button,input,select,textarea,a,label')) return;
@@ -23,14 +63,14 @@ export function makeDraggable(el, handle) {
         const origTop = rect.top;
 
         const move = (ev) => {
-            const nx = Math.max(0, Math.min(window.innerWidth - 40, origLeft + ev.clientX - startX));
-            const ny = Math.max(0, Math.min(window.innerHeight - 28, origTop + ev.clientY - startY));
-            el.style.left = `${nx}px`;
-            el.style.top = `${ny}px`;
+            const { left, top } = clampPos(origLeft + ev.clientX - startX, origTop + ev.clientY - startY);
+            el.style.left = `${left}px`;
+            el.style.top = `${top}px`;
         };
         const up = () => {
             window.removeEventListener('pointermove', move);
             window.removeEventListener('pointerup', up);
+            if (key) savePos(key, { left: parseFloat(el.style.left) || 0, top: parseFloat(el.style.top) || 0 });
         };
         window.addEventListener('pointermove', move);
         window.addEventListener('pointerup', up);

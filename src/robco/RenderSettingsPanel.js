@@ -114,7 +114,7 @@ export class RenderSettingsPanel {
 
         document.body.appendChild(root);
         this.root = root;
-        makeDraggable(root, title);
+        makeDraggable(root, title, 'render');
     }
 
     // --- apply ----------------------------------------------------------

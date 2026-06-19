@@ -12,7 +12,7 @@
 import { makeDraggable } from './draggable.js';
 
 const PANEL_CSS =
-    'position:fixed;right:16px;top:64px;z-index:3000;width:288px;font:12px/1.4 ui-monospace,Menlo,Consolas,monospace;' +
+    'position:fixed;right:332px;top:16px;z-index:3000;width:288px;font:12px/1.4 ui-monospace,Menlo,Consolas,monospace;' +
     'color:#e6edf3;background:rgba(13,17,23,0.9);border:1px solid rgba(255,255,255,0.12);border-radius:10px;' +
     'padding:10px 12px;backdrop-filter:blur(6px);box-shadow:0 6px 24px rgba(0,0,0,0.4);';
 const BTN = 'font:600 11px ui-monospace,monospace;color:#e6edf3;background:rgba(255,255,255,0.06);' +
@@ -96,7 +96,7 @@ export class StreamRatePanel {
         document.body.appendChild(root);
         this.root = root;
         this.body = body;
-        makeDraggable(root, t);
+        makeDraggable(root, t, 'stream');
     }
 
     _measure() {

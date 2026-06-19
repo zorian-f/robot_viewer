@@ -64,6 +64,19 @@ export class ViewPanel {
 
     _render() { this.sm.redraw?.(); this.sm.render?.(); }
 
+    /** Lazy-load the convex-decomposition collision STLs on first enable, then toggle them. */
+    async _setCollision(on) {
+        const nodes = this._model()?.userData?.moduleNodes || [];
+        if (on && !this._collisionLoaded) {
+            this._collisionLoaded = true;
+            if (this._hoverOut) this._hoverOut.textContent = 'loading collision meshes…';
+            await Promise.all(nodes.map((n) => n.loadCollision?.()));
+            if (this._hoverOut) this._hoverOut.textContent = '';
+        }
+        nodes.forEach((n) => n.setCollisionVisible?.(on));
+        this._render();
+    }
+
     _build() {
         const root = el('div', PANEL_CSS);
         const header = el('div', 'display:flex;align-items:center;justify-content:space-between;font-weight:600;color:#fff;');
@@ -77,7 +90,7 @@ export class ViewPanel {
         // Geometry
         body.append(title('Geometry'));
         body.append(this._check('Visual meshes', (on) => this.sm.visualizationManager?.toggleVisual(on, this._model()), true));
-        body.append(this._check('Collision meshes', (on) => this.sm.visualizationManager?.toggleCollision(on)));
+        body.append(this._check('Collision meshes', (on) => this._setCollision(on)));
 
         // Inertia
         body.append(title('Inertia'));

@@ -84,6 +84,7 @@ export class RobotModuleNode {
      */
     async initFromJSON(descriptor, folderUrl) {
         this.descriptor = descriptor;
+        this.folderUrl = folderUrl; // kept for lazy collision-mesh loading
         this.moduleType = descriptor['module-type'];
         this.typeId = String(descriptor['type-id'] ?? '');
         this.name = descriptor.name || this.moduleId;
@@ -147,6 +148,43 @@ export class RobotModuleNode {
         const t = new THREE.Matrix4().makeRotationZ(angleRad);
         t.multiplyMatrices(this.distalTf, t); // distalTf * Rz
         this.distal.setRotationFromMatrix(t);
+    }
+
+    /**
+     * Lazily load the convex-decomposition collision meshes (.stl) onto the proximal/distal
+     * links, hidden, as a translucent overlay. Idempotent.
+     * @returns {Promise<THREE.Mesh[]>}
+     */
+    async loadCollision() {
+        if (this._collisionLoaded) return this._collisionMeshes;
+        this._collisionLoaded = true;
+        this._collisionMeshes = [];
+        const cv = this.descriptor?.collisions_visuals || {};
+        const { STLLoader } = await import('three/examples/jsm/loaders/STLLoader.js');
+        const mat = new THREE.MeshStandardMaterial({
+            color: 0x00e0a0, transparent: true, opacity: 0.35, depthWrite: false, roughness: 0.7,
+        });
+        const loadInto = async (file, node) => {
+            if (!file) return;
+            try {
+                const geo = await new Promise((res, rej) =>
+                    new STLLoader().load(`${this.folderUrl}/${file}`, res, undefined, rej));
+                const mesh = new THREE.Mesh(geo, mat);
+                mesh.userData.isCollisionMesh = true;
+                mesh.visible = false;
+                node.add(mesh);
+                this._collisionMeshes.push(mesh);
+            } catch (e) {
+                console.warn(`[RobCo] collision STL load failed (${file}):`, e);
+            }
+        };
+        await loadInto(cv.proximal_approximation_mesh, this.proximal);
+        if (this.isDriveModule) await loadInto(cv.distal_approximation_mesh, this.distal);
+        return this._collisionMeshes;
+    }
+
+    setCollisionVisible(on) {
+        (this._collisionMeshes || []).forEach((m) => { m.visible = on; });
     }
 
     /**

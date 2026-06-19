@@ -1,0 +1,141 @@
+{
+    "header": {
+        "date": "04.05.2022",
+        "author": "Paul Maroldt"
+    },
+
+    "module-type": "Drive",
+    "type-id": 1,
+    "name": "D86",
+    "full-name": "D86",
+    "legacy": true,
+    "module-revision": "bravo",
+    "robot-version": 2,
+
+    "interface": {
+        "input_flange": "86_pin",
+        "output_flange": "86_pin"
+    },
+
+    "kinematics": {
+        "proximal_transformation": [
+            [  0,  0,  1,  0],
+            [  1,  0,  0,  0],
+            [  0,  1,  0,  0.064],
+            [  0,  0,  0,  1]
+        ],
+
+        "distal_transformation": [
+            [  0, -1,  0,  0],
+            [  1,  0,  0,  0],
+            [  0,  0,  1,  0.0555],
+            [  0,  0,  0,  1]
+        ]
+    },
+
+    "dynamics": {
+        "proximal_mass": 1.78,
+        "proximal_inertia": [
+            [ 7.58e-3,  1.89e-5, -7.45e-5],
+            [ 1.89e-5,  8.14e-3, -1.64e-5],
+            [-7.45e-5, -1.64e-5,  2.15e-3]
+        ],
+        "proximal_center_of_mass": [6.2e-4, 1.8e-4, 5.82e-2],
+
+        "distal_mass": 0.282,
+        "distal_inertia": [
+            [ 2.87e-4,  0,       -5.10e-8],
+            [ 0      ,  2.87e-4, -8.90e-8],
+            [-5.10e-8, -8.90e-8,  1.22e-4]
+        ],
+        "distal_center_of_mass": [0, 0, -2.25e-2],
+
+        "motor_inertia": 4.76e-5
+    },
+
+    "friction_parameters": {
+        "friction_coulomb": 4.04,
+        "friction_viscous": 2.07,
+        "friction_polynomial": null,
+        "temperature_adaption": null
+    },
+
+    "module_properties": {
+        "q_upper_hard": 6.2832,
+        "q_lower_hard": -6.2832,
+        "q_safety_margin": 1.5708,
+        "rated_torque": 23.1,
+        "peak_torque": 60,
+        "rated_current": 7.8,
+        "peak_current": 24.9,
+        "power": 100,
+        "max_velocity": 6.28
+    },
+
+    "motor": {
+        "name": "DRVA_DB-ILM-Kits_ILM-E50x14-deltaserial",
+        "datasheet_version": "Rev??",
+        "torque_constant": 0.076368,
+        "rated_current": 4.596,
+        "rated_torque": 0.35,
+        "linear_deviation": null,
+        "phase_resistance": 0.147,
+        "phase_inductance": 0.000189,
+        "number_pole_pairs": 10,
+        "peak_torque": 3000,
+        "peak_current": 3000
+    },
+
+    "gears": {
+        "name": "harmonic-drive SHG ...",
+        "datasheet_version": "1021386 12/2018 V02",
+        "ratio": 101,
+        "elasticity": null
+    },
+
+    "controller": {
+        "name": "Circulo_700_A2_rev2"
+    },
+
+    "encoder_motor": {
+        "name": "Circulo_700_A2_rev2",
+        "resolution": 524288
+    },
+
+    "encoder_link": {
+        "name": "Circulo_700_A2_rev2",
+        "resolution": 524288
+    },
+
+    "brake": {
+        "name": "brake",
+        "type": "pin-style",
+        "pull-voltage": 40,
+        "hold-voltage": 8,
+        "pull-time": 500
+    },
+
+    "current-controller": null,
+
+    "collisions_visuals": {
+        "proximal_visual_mesh": "D86-legacy-proximal.glb",
+        "proximal_approximation_mesh": "D86-legacy-proximal_convdec.stl",
+        "distal_visual_mesh": "D86-legacy-distal.glb",
+        "distal_approximation_mesh": "D86-legacy-distal_convdec.stl",
+        "step-file": ""
+    },
+
+    "optimizer": {
+        "price": 2000
+    },
+
+    "io": {
+        "digital_input_mapping": [],
+        "digital_output_mapping": []
+    },
+
+    "configuration": {
+        "circulo_configuration_file": "0001_D86.csv",
+        "eeprom_file": "0001_D86.bin"
+    }
+}

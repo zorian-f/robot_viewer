@@ -1,0 +1,58 @@
+{
+    "header": {
+        "date": "03.05.2022",
+        "author": "Max Körsten"
+    },
+
+    "module-type": "Link",
+    "type-id": 5,
+    "name": "I86-150",
+    "full-name": "I86-150",
+    "legacy": true,
+    "module-revision": "",
+    "robot-version": 2,
+
+    "interface": {
+        "input_flange": "86_pin",
+        "output_flange": "86_pin"
+    },
+
+    "kinematics": {
+        "proximal_transformation": [
+            [  1,  0,  0,  0],
+            [  0,  1,  0,  0],
+            [  0,  0,  1,  0.150],
+            [  0,  0,  0,  1]
+        ]
+    },
+
+    "dynamics": {
+        "proximal_mass": 0.6737034,
+        "proximal_inertia": [
+            [ 0.0058686,  0, 0],
+            [ 0,  0.0058685, 0],
+            [ 0, 0,  0.0006312]
+        ],
+        "proximal_center_of_mass": [0.0000153, -0.0000151, 0.0758040],
+        "elasticityparameter": null
+    },
+
+    "collisions_visuals": {
+        "proximal_visual_mesh": "I86-150.glb",
+        "proximal_approximation_mesh": "I86-150_convdec.stl",
+        "step-file": ""
+    },
+
+    "optimizer": {
+        "price": 300
+    },
+
+    "io": {
+        "digital_input_mapping": [],
+        "digital_output_mapping": []
+    },
+
+    "configuration": {
+        "eeprom_file": "0005_I86-150.bin"
+    }
+}

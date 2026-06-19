@@ -1026,7 +1026,13 @@ class App {
 
 // Create and start application
 const app = new App();
-app.init();
 
 // Expose to global (for debugging)
 window.app = app;
+
+// Start, then run the optional RobCo dev loader (no-op unless ?robco= is present).
+app.init().then(() => {
+    import('./robco/devLoad.js')
+        .then(({ maybeLoadRobCo }) => maybeLoadRobCo(app))
+        .catch((err) => console.error('[RobCo] dev loader failed to import:', err));
+});

@@ -1,0 +1,2144 @@
+{
+    "0001": {
+        "moduleName": "D86",
+        "fullName": "D86",
+        "folderName": "0001_D86",
+        "fileName": "0001_D86.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Drive",
+        "legacy": true
+    },
+    "0002": {
+        "moduleName": "D116",
+        "fullName": "D116",
+        "folderName": "0002_D116",
+        "fileName": "0002_D116.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Drive",
+        "legacy": true
+    },
+    "0003": {
+        "moduleName": "D116",
+        "fullName": "D116",
+        "folderName": "0003_D116",
+        "fileName": "0003_D116.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Drive",
+        "legacy": true
+    },
+    "0005": {
+        "moduleName": "I86-150",
+        "fullName": "I86-150",
+        "folderName": "0005_I86-150",
+        "fileName": "0005_I86-150.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0006": {
+        "moduleName": "I86-200",
+        "fullName": "I86-200",
+        "folderName": "0006_I86-200",
+        "fileName": "0006_I86-200.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0007": {
+        "moduleName": "I86-300",
+        "fullName": "I86-300",
+        "folderName": "0007_I86-300",
+        "fileName": "0007_I86-300.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0008": {
+        "moduleName": "I86-400",
+        "fullName": "I86-400",
+        "folderName": "0008_I86-400",
+        "fileName": "0008_I86-400.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0009": {
+        "moduleName": "I86-500",
+        "fullName": "I86-500",
+        "folderName": "0009_I86-500",
+        "fileName": "0009_I86-500.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0010": {
+        "moduleName": "I86-600",
+        "fullName": "I86-600",
+        "folderName": "0010_I86-600",
+        "fileName": "0010_I86-600.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0011": {
+        "moduleName": "I86-700",
+        "fullName": "I86-700",
+        "folderName": "0011_I86-700",
+        "fileName": "0011_I86-700.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0012": {
+        "moduleName": "L86-150",
+        "fullName": "L86-150",
+        "folderName": "0012_L86-150",
+        "fileName": "0012_L86-150.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0013": {
+        "moduleName": "L86-200",
+        "fullName": "L86-200",
+        "folderName": "0013_L86-200",
+        "fileName": "0013_L86-200.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0014": {
+        "moduleName": "L86-300",
+        "fullName": "L86-300",
+        "folderName": "0014_L86-300",
+        "fileName": "0014_L86-300.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0015": {
+        "moduleName": "L86-400",
+        "fullName": "L86-400",
+        "folderName": "0015_L86-400",
+        "fileName": "0015_L86-400.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0016": {
+        "moduleName": "L86-500",
+        "fullName": "L86-500",
+        "folderName": "0016_L86-500",
+        "fileName": "0016_L86-500.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0017": {
+        "moduleName": "L86-600",
+        "fullName": "L86-600",
+        "folderName": "0017_L86-600",
+        "fileName": "0017_L86-600.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0018": {
+        "moduleName": "L86-700",
+        "fullName": "L86-700",
+        "folderName": "0018_L86-700",
+        "fileName": "0018_L86-700.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0020": {
+        "moduleName": "L116-400",
+        "fullName": "L116-400",
+        "folderName": "0020_L116-400",
+        "fileName": "0020_L116-400.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0021": {
+        "moduleName": "L86-186",
+        "fullName": "L86-186",
+        "folderName": "0021_L86-186",
+        "fileName": "0021_L86-186.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0022": {
+        "moduleName": "L86-286",
+        "fullName": "L86-286",
+        "folderName": "0022_L86-286",
+        "fileName": "0022_L86-286.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0023": {
+        "moduleName": "I86-250",
+        "fullName": "I86-250",
+        "folderName": "0023_I86-250",
+        "fileName": "0023_I86-250.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0024": {
+        "moduleName": "L116-1000",
+        "fullName": "L116-1000",
+        "folderName": "0024_L116-1000",
+        "fileName": "0024_L116-1000.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0025": {
+        "moduleName": "L116-448",
+        "fullName": "L116-448",
+        "folderName": "0025_L116-448",
+        "fileName": "0025_L116-448.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0026": {
+        "moduleName": "L116-348",
+        "fullName": "L116-348",
+        "folderName": "0026_L116-348",
+        "fileName": "0026_L116-348.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0027": {
+        "moduleName": "L116-500",
+        "fullName": "L116-500",
+        "folderName": "0027_L116-500",
+        "fileName": "0027_L116-500.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0028": {
+        "moduleName": "L116-600",
+        "fullName": "L116-600",
+        "folderName": "0028_L116-600",
+        "fileName": "0028_L116-600.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0029": {
+        "moduleName": "L116-800",
+        "fullName": "L116-800",
+        "folderName": "0029_L116-800",
+        "fileName": "0029_L116-800.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0030": {
+        "moduleName": "L116-200",
+        "fullName": "L116-200",
+        "folderName": "0030_L116-200",
+        "fileName": "0030_L116-200.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0031": {
+        "moduleName": "L86-55",
+        "fullName": "L86-55",
+        "folderName": "0031_L86-55",
+        "fileName": "0031_L86-55.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0032": {
+        "moduleName": "L86-383",
+        "fullName": "L86-383",
+        "folderName": "0032_L86-383",
+        "fileName": "0032_L86-383.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0033": {
+        "moduleName": "I86-141",
+        "fullName": "I86-141",
+        "folderName": "0033_I86-141",
+        "fileName": "0033_I86-141.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0034": {
+        "moduleName": "I86-350",
+        "fullName": "I86-350",
+        "folderName": "0034_I86-350",
+        "fileName": "0034_I86-350.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0035": {
+        "moduleName": "L86-336",
+        "fullName": "L86-336",
+        "folderName": "0035_L86-336",
+        "fileName": "0035_L86-336.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0036": {
+        "moduleName": "L86-250",
+        "fullName": "L86-250",
+        "folderName": "0036_L86-250",
+        "fileName": "0036_L86-250.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0037": {
+        "moduleName": "D86",
+        "fullName": "D86",
+        "folderName": "0037_D86",
+        "fileName": "0037_D86.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Drive",
+        "legacy": true
+    },
+    "0038": {
+        "moduleName": "D116",
+        "fullName": "D116",
+        "folderName": "0038_D116",
+        "fileName": "0038_D116.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Drive",
+        "legacy": true
+    },
+    "0039": {
+        "moduleName": "D86",
+        "fullName": "D86",
+        "folderName": "0039_D86",
+        "fileName": "0039_D86.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Drive",
+        "legacy": true
+    },
+    "0040": {
+        "moduleName": "D86",
+        "fullName": "D86",
+        "folderName": "0040_D86",
+        "fileName": "0040_D86.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Drive",
+        "legacy": true
+    },
+    "0041": {
+        "moduleName": "D86",
+        "fullName": "D86",
+        "folderName": "0041_D86",
+        "fileName": "0041_D86.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Drive",
+        "legacy": true
+    },
+    "0042": {
+        "moduleName": "D86",
+        "fullName": "D86",
+        "folderName": "0042_D86",
+        "fileName": "0042_D86.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Drive",
+        "legacy": true
+    },
+    "0043": {
+        "moduleName": "D86",
+        "fullName": "D86",
+        "folderName": "0043_D86",
+        "fileName": "0043_D86.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Drive",
+        "legacy": true
+    },
+    "0044": {
+        "moduleName": "D116",
+        "fullName": "D116",
+        "folderName": "0044_D116",
+        "fileName": "0044_D116.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Drive",
+        "legacy": true
+    },
+    "0045": {
+        "moduleName": "D116",
+        "fullName": "D116",
+        "folderName": "0045_D116",
+        "fileName": "0045_D116.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Drive",
+        "legacy": true
+    },
+    "0046": {
+        "moduleName": "D148",
+        "fullName": "D148",
+        "folderName": "0046_D148",
+        "fileName": "0046_D148.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Drive",
+        "legacy": true
+    },
+    "0047": {
+        "moduleName": "L148-1000",
+        "fullName": "L148-1000",
+        "folderName": "0047_L148-1000",
+        "fileName": "0047_L148-1000.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0049": {
+        "moduleName": "I116-1000",
+        "fullName": "I116-1000",
+        "folderName": "0049_I116-1000",
+        "fileName": "0049_I116-1000.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0050": {
+        "moduleName": "I148-1000",
+        "fullName": "I148-1000",
+        "folderName": "0050_I148-1000",
+        "fileName": "0050_I148-1000.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0051": {
+        "moduleName": "I116-800",
+        "fullName": "I116-800",
+        "folderName": "0051_I116-800",
+        "fileName": "0051_I116-800.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0052": {
+        "moduleName": "I148-800",
+        "fullName": "I148-800",
+        "folderName": "0052_I148-800",
+        "fileName": "0052_I148-800.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0053": {
+        "moduleName": "I116-300",
+        "fullName": "I116-300",
+        "folderName": "0053_I116-300",
+        "fileName": "0053_I116-300.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0054": {
+        "moduleName": "L116-300",
+        "fullName": "L116-300",
+        "folderName": "0054_L116-300",
+        "fileName": "0054_L116-300.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0055": {
+        "moduleName": "L148-800",
+        "fullName": "L148-800",
+        "folderName": "0055_L148-800",
+        "fileName": "0055_L148-800.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0056": {
+        "moduleName": "I116-500",
+        "fullName": "I116-500",
+        "folderName": "0056_I116-500",
+        "fileName": "0056_I116-500.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0057": {
+        "moduleName": "L148-550",
+        "fullName": "L148-550",
+        "folderName": "0057_L148-550",
+        "fileName": "0057_L148-550.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0058": {
+        "moduleName": "I148-650",
+        "fullName": "I148-650",
+        "folderName": "0058_I148-650",
+        "fileName": "0058_I148-650.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0059": {
+        "moduleName": "I116-650",
+        "fullName": "I116-650",
+        "folderName": "0059_I116-650",
+        "fileName": "0059_I116-650.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0060": {
+        "moduleName": "L148-600",
+        "fullName": "L148-600",
+        "folderName": "0060_L148-600",
+        "fileName": "0060_L148-600.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0061": {
+        "moduleName": "D86",
+        "fullName": "D86",
+        "folderName": "0061_D86",
+        "fileName": "0061_D86.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Drive",
+        "legacy": true
+    },
+    "0062": {
+        "moduleName": "I116-750",
+        "fullName": "I116-750",
+        "folderName": "0062_I116-750",
+        "fileName": "0062_I116-750.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0063": {
+        "moduleName": "L148-400",
+        "fullName": "L148-400",
+        "folderName": "0063_L148-400",
+        "fileName": "0063_L148-400.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0064": {
+        "moduleName": "D86",
+        "fullName": "D86",
+        "folderName": "0064_D86",
+        "fileName": "0064_D86.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Drive",
+        "legacy": true
+    },
+    "0065": {
+        "moduleName": "D86",
+        "fullName": "D86",
+        "folderName": "0065_D86",
+        "fileName": "0065_D86.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Drive",
+        "legacy": true
+    },
+    "0066": {
+        "moduleName": "D116",
+        "fullName": "D116",
+        "folderName": "0066_D116",
+        "fileName": "0066_D116.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Drive",
+        "legacy": true
+    },
+    "0067": {
+        "moduleName": "D148",
+        "fullName": "D148",
+        "folderName": "0067_D148",
+        "fileName": "0067_D148.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Drive",
+        "legacy": true
+    },
+    "0068": {
+        "moduleName": "I116-400",
+        "fullName": "I116-400",
+        "folderName": "0068_I116-400",
+        "fileName": "0068_I116-400.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0069": {
+        "moduleName": "I86-160",
+        "fullName": "I86-160",
+        "folderName": "0069_I86-160",
+        "fileName": "0069_I86-160.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0070": {
+        "moduleName": "L86-350",
+        "fullName": "L86-350",
+        "folderName": "0070_L86-350",
+        "fileName": "0070_L86-350.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0071": {
+        "moduleName": "I86-310",
+        "fullName": "I86-310",
+        "folderName": "0071_I86-310",
+        "fileName": "0071_I86-310.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0072": {
+        "moduleName": "L86-240",
+        "fullName": "L86-240",
+        "folderName": "0072_L86-240",
+        "fileName": "0072_L86-240.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0073": {
+        "moduleName": "L86-340",
+        "fullName": "L86-340",
+        "folderName": "0073_L86-340",
+        "fileName": "0073_L86-340.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0074": {
+        "moduleName": "L86-440",
+        "fullName": "L86-440",
+        "folderName": "0074_L86-440",
+        "fileName": "0074_L86-440.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0075": {
+        "moduleName": "I116-450",
+        "fullName": "I116-450",
+        "folderName": "0075_I116-450",
+        "fileName": "0075_I116-450.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0076": {
+        "moduleName": "I116-600",
+        "fullName": "I116-600",
+        "folderName": "0076_I116-600",
+        "fileName": "0076_I116-600.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0078": {
+        "moduleName": "L116-350",
+        "fullName": "L116-350",
+        "folderName": "0078_L116-350",
+        "fileName": "0078_L116-350.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0079": {
+        "moduleName": "L116-650",
+        "fullName": "L116-650",
+        "folderName": "0079_L116-650",
+        "fileName": "0079_L116-650.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0080": {
+        "moduleName": "I148-600",
+        "fullName": "I148-600",
+        "folderName": "0080_I148-600",
+        "fileName": "0080_I148-600.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0081": {
+        "moduleName": "I148-400",
+        "fullName": "I148-400",
+        "folderName": "0081_I148-400",
+        "fileName": "0081_I148-400.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0082": {
+        "moduleName": "L148-470",
+        "fullName": "L148-470",
+        "folderName": "0082_L148-470",
+        "fileName": "0082_L148-470.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0083": {
+        "moduleName": "L148-670",
+        "fullName": "L148-670",
+        "folderName": "0083_L148-670",
+        "fileName": "0083_L148-670.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0084": {
+        "moduleName": "L148-870",
+        "fullName": "L148-870",
+        "folderName": "0084_L148-870",
+        "fileName": "0084_L148-870.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0085": {
+        "moduleName": "D86",
+        "fullName": "D86",
+        "folderName": "0085_D86",
+        "fileName": "0085_D86.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Drive",
+        "legacy": true
+    },
+    "0086": {
+        "moduleName": "D116",
+        "fullName": "D116",
+        "folderName": "0086_D116",
+        "fileName": "0086_D116.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Drive",
+        "legacy": true
+    },
+    "0087": {
+        "moduleName": "D86",
+        "fullName": "D86",
+        "folderName": "0087_D86",
+        "fileName": "0087_D86.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Drive",
+        "legacy": true
+    },
+    "0088": {
+        "moduleName": "D116",
+        "fullName": "D116",
+        "folderName": "0088_D116",
+        "fileName": "0088_D116.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Drive",
+        "legacy": true
+    },
+    "0089": {
+        "moduleName": "D116",
+        "fullName": "D116",
+        "folderName": "0089_D116",
+        "fileName": "0089_D116.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Drive",
+        "legacy": true
+    },
+    "0090": {
+        "moduleName": "L148-710",
+        "fullName": "L148-710",
+        "folderName": "0090_L148-710",
+        "fileName": "0090_L148-710.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0091": {
+        "moduleName": "D148",
+        "fullName": "D148",
+        "folderName": "0091_D148",
+        "fileName": "0091_D148.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Drive",
+        "legacy": true
+    },
+    "0092": {
+        "moduleName": "I86-270",
+        "fullName": "I86-270",
+        "folderName": "0092_I86-270",
+        "fileName": "0092_I86-270.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0093": {
+        "moduleName": "I86-305",
+        "fullName": "I86-305",
+        "folderName": "0093_I86-305",
+        "fileName": "0093_I86-305.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0094": {
+        "moduleName": "L86-165",
+        "fullName": "L86-165",
+        "folderName": "0094_L86-165",
+        "fileName": "0094_L86-165.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0095": {
+        "moduleName": "I116-305",
+        "fullName": "I116-305",
+        "folderName": "0095_I116-305",
+        "fileName": "0095_I116-305.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0096": {
+        "moduleName": "L86-82",
+        "fullName": "L86-82",
+        "folderName": "0096_L86-82",
+        "fileName": "0096_L86-82.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0097": {
+        "moduleName": "D86-KM",
+        "fullName": "D86-KM",
+        "folderName": "0097_D86-KM",
+        "fileName": "0097_D86-KM.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Drive",
+        "legacy": true
+    },
+    "0098": {
+        "moduleName": "D116-KM",
+        "fullName": "D116-KM",
+        "folderName": "0098_D116-KM",
+        "fileName": "0098_D116-KM.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Drive",
+        "legacy": true
+    },
+    "0099": {
+        "moduleName": "I86-220",
+        "fullName": "I86-220",
+        "folderName": "0099_I86-220",
+        "fileName": "0099_I86-220.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0100": {
+        "moduleName": "BD116-KM",
+        "fullName": "BD116-KM",
+        "folderName": "0100_BD116-KM",
+        "fileName": "0100_BD116-KM.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "BaseDrive",
+        "legacy": true
+    },
+    "0101": {
+        "moduleName": "B-dummy",
+        "fullName": "B-dummy",
+        "folderName": "0101_B-dummy",
+        "fileName": "0101_B-dummy.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Base",
+        "legacy": true
+    },
+    "0103": {
+        "moduleName": "B86",
+        "fullName": "B86",
+        "folderName": "0103_B86",
+        "fileName": "0103_B86.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Base",
+        "legacy": true
+    },
+    "0104": {
+        "moduleName": "B86-90deg",
+        "fullName": "B86-90deg",
+        "folderName": "0104_B86-90deg",
+        "fileName": "0104_B86-90deg.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Base",
+        "legacy": true
+    },
+    "0105": {
+        "moduleName": "B116",
+        "fullName": "B116",
+        "folderName": "0105_B116",
+        "fileName": "0105_B116.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Base",
+        "legacy": true
+    },
+    "0106": {
+        "moduleName": "B116-90deg",
+        "fullName": "B116-90deg",
+        "folderName": "0106_B116-90deg",
+        "fileName": "0106_B116-90deg.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Base",
+        "legacy": true
+    },
+    "0108": {
+        "moduleName": "B86-minus90deg",
+        "fullName": "B86-minus90deg",
+        "folderName": "0108_B86-minus90deg",
+        "fileName": "0108_B86-minus90deg.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Base",
+        "legacy": true
+    },
+    "0109": {
+        "moduleName": "B116-minus90deg",
+        "fullName": "B116-minus90deg",
+        "folderName": "0109_B116-minus90deg",
+        "fileName": "0109_B116-minus90deg.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Base",
+        "legacy": true
+    },
+    "0110": {
+        "moduleName": "B148-90deg",
+        "fullName": "B148-90deg",
+        "folderName": "0110_B148-90deg",
+        "fileName": "0110_B148-90deg.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Base",
+        "legacy": true
+    },
+    "0111": {
+        "moduleName": "B148",
+        "fullName": "B148",
+        "folderName": "0111_B148",
+        "fileName": "0111_B148.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Base",
+        "legacy": true
+    },
+    "0112": {
+        "moduleName": "D148-KM",
+        "fullName": "D148-KM",
+        "folderName": "0112_D148-KM",
+        "fileName": "0112_D148-KM.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Drive",
+        "legacy": true
+    },
+    "0113": {
+        "moduleName": "I86-Robominds-Camera-Module",
+        "fullName": "I86-Robominds-Camera-Module",
+        "folderName": "0113_I86-Robominds-Camera-Module",
+        "fileName": "0113_I86-Robominds-Camera-Module.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0116": {
+        "moduleName": "BD148-KM",
+        "fullName": "BD148-KM",
+        "folderName": "0116_BD148-KM",
+        "fileName": "0116_BD148-KM.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "BaseDrive",
+        "legacy": true
+    },
+    "0117": {
+        "moduleName": "L148-720",
+        "fullName": "L148-720",
+        "folderName": "0117_L148-720",
+        "fileName": "0117_L148-720.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0118": {
+        "moduleName": "L116-700",
+        "fullName": "L116-700",
+        "folderName": "0118_L116-700",
+        "fileName": "0118_L116-700.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0119": {
+        "moduleName": "D193",
+        "fullName": "D193-A",
+        "folderName": "0119_D193-A",
+        "fileName": "0119_D193-A.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Drive",
+        "legacy": true
+    },
+    "0120": {
+        "moduleName": "BD193",
+        "fullName": "BD193-A",
+        "folderName": "0120_BD193-A",
+        "fileName": "0120_BD193-A.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "BaseDrive",
+        "legacy": true
+    },
+    "0121": {
+        "moduleName": "L148-1070",
+        "fullName": "L148-1070",
+        "folderName": "0121_L148-1070",
+        "fileName": "0121_L148-1070.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0122": {
+        "moduleName": "I148-116-1000",
+        "fullName": "I148-116-1000",
+        "folderName": "0122_I148-116-1000",
+        "fileName": "0122_I148-116-1000.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0123": {
+        "moduleName": "L193-148-1000",
+        "fullName": "L193-148-1000",
+        "folderName": "0123_L193-148-1000",
+        "fileName": "0123_L193-148-1000.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0124": {
+        "moduleName": "L148-116-870",
+        "fullName": "L148-116-870",
+        "folderName": "0124_L148-116-870",
+        "fileName": "0124_L148-116-870.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0125": {
+        "moduleName": "I-dummy",
+        "fullName": "I-dummy",
+        "folderName": "0125_I-dummy",
+        "fileName": "0125_I-dummy.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0126": {
+        "moduleName": "L193-148-650",
+        "fullName": "L193-148-650",
+        "folderName": "0126_L193-148-650",
+        "fileName": "0126_L193-148-650.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0127": {
+        "moduleName": "L193-148-800",
+        "fullName": "L193-148-800",
+        "folderName": "0127_L193-148-800",
+        "fileName": "0127_L193-148-800.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0128": {
+        "moduleName": "L148-116-950",
+        "fullName": "L148-116-950",
+        "folderName": "0128_L148-116-950",
+        "fileName": "0128_L148-116-950.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0129": {
+        "moduleName": "L148-116-650",
+        "fullName": "L148-116-650",
+        "folderName": "0129_L148-116-650",
+        "fileName": "0129_L148-116-650.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0130": {
+        "moduleName": "I148-116-800",
+        "fullName": "I148-116-800",
+        "folderName": "0130_I148-116-800",
+        "fileName": "0130_I148-116-800.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0131": {
+        "moduleName": "L193-148-950",
+        "fullName": "L193-148-950",
+        "folderName": "0131_L193-148-950",
+        "fileName": "0131_L193-148-950.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0132": {
+        "moduleName": "I116-86-800",
+        "fullName": "I116-86-800",
+        "folderName": "0132_I116-86-800",
+        "fileName": "0132_I116-86-800.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0133": {
+        "moduleName": "I86-150-Orbbec-Camera-Module",
+        "fullName": "I86-150-Orbbec-Camera-Module",
+        "folderName": "0133_I86-150-Orbbec-Camera-Module",
+        "fileName": "0133_I86-150-Orbbec-Camera-Module.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0134": {
+        "moduleName": "L193-148-1100",
+        "fullName": "L193-148-1100",
+        "folderName": "0134_L193-148-1100",
+        "fileName": "0134_L193-148-1100.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0135": {
+        "moduleName": "L148-970",
+        "fullName": "L148-970",
+        "folderName": "0135_L148-970",
+        "fileName": "0135_L148-970.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0300": {
+        "moduleName": "D86",
+        "fullName": "D86-B",
+        "folderName": "0300_D86-B",
+        "fileName": "0300_D86-B.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Drive",
+        "legacy": false
+    },
+    "0301": {
+        "moduleName": "D116",
+        "fullName": "D116-C",
+        "folderName": "0301_D116-C",
+        "fileName": "0301_D116-C.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Drive",
+        "legacy": false
+    },
+    "0302": {
+        "moduleName": "D148",
+        "fullName": "D148-C",
+        "folderName": "0302_D148-C",
+        "fileName": "0302_D148-C.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Drive",
+        "legacy": false
+    },
+    "0303": {
+        "moduleName": "D193",
+        "fullName": "D193-B",
+        "folderName": "0303_D193-B",
+        "fileName": "0303_D193-B.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Drive",
+        "legacy": true
+    },
+    "0304": {
+        "moduleName": "BD116",
+        "fullName": "BD116-B-Tall",
+        "folderName": "0304_BD116-B-Tall",
+        "fileName": "0304_BD116-B-Tall.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "BaseDrive",
+        "legacy": false
+    },
+    "0305": {
+        "moduleName": "BD148",
+        "fullName": "BD148-B-Tall",
+        "folderName": "0305_BD148-B-Tall",
+        "fileName": "0305_BD148-B-Tall.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "BaseDrive",
+        "legacy": false
+    },
+    "0306": {
+        "moduleName": "BD193",
+        "fullName": "BD193-B",
+        "folderName": "0306_BD193-B",
+        "fileName": "0306_BD193-B.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "BaseDrive",
+        "legacy": true
+    },
+    "0307": {
+        "moduleName": "I86-86-200",
+        "fullName": "I86-86-200-B",
+        "folderName": "0307_I86-86-200-B",
+        "fileName": "0307_I86-86-200-B.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Link",
+        "legacy": false
+    },
+    "0308": {
+        "moduleName": "I86-86-300",
+        "fullName": "I86-86-300-B",
+        "folderName": "0308_I86-86-300-B",
+        "fileName": "0308_I86-86-300-B.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Link",
+        "legacy": false
+    },
+    "0309": {
+        "moduleName": "I86-86-400",
+        "fullName": "I86-86-400-B",
+        "folderName": "0309_I86-86-400-B",
+        "fileName": "0309_I86-86-400-B.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Link",
+        "legacy": false
+    },
+    "0310": {
+        "moduleName": "L86-86-240",
+        "fullName": "L86-86-240-B",
+        "folderName": "0310_L86-86-240-B",
+        "fileName": "0310_L86-86-240-B.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Link",
+        "legacy": false
+    },
+    "0311": {
+        "moduleName": "L86-86-340",
+        "fullName": "L86-86-340-B",
+        "folderName": "0311_L86-86-340-B",
+        "fileName": "0311_L86-86-340-B.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Link",
+        "legacy": false
+    },
+    "0312": {
+        "moduleName": "L86-86-440",
+        "fullName": "L86-86-440-B",
+        "folderName": "0312_L86-86-440-B",
+        "fileName": "0312_L86-86-440-B.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Link",
+        "legacy": false
+    },
+    "0313": {
+        "moduleName": "I116-86-300",
+        "fullName": "I116-86-300-B",
+        "folderName": "0313_I116-86-300-B",
+        "fileName": "0313_I116-86-300-B.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Link",
+        "legacy": false
+    },
+    "0314": {
+        "moduleName": "I116-86-450",
+        "fullName": "I116-86-450-B",
+        "folderName": "0314_I116-86-450-B",
+        "fileName": "0314_I116-86-450-B.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Link",
+        "legacy": false
+    },
+    "0315": {
+        "moduleName": "I116-86-600",
+        "fullName": "I116-86-600-B",
+        "folderName": "0315_I116-86-600-B",
+        "fileName": "0315_I116-86-600-B.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Link",
+        "legacy": false
+    },
+    "0316": {
+        "moduleName": "I116-86-750",
+        "fullName": "I116-86-750-B",
+        "folderName": "0316_I116-86-750-B",
+        "fileName": "0316_I116-86-750-B.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Link",
+        "legacy": false
+    },
+    "0317": {
+        "moduleName": "L116-86-350",
+        "fullName": "L116-86-350-B",
+        "folderName": "0317_L116-86-350-B",
+        "fileName": "0317_L116-86-350-B.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Link",
+        "legacy": false
+    },
+    "0318": {
+        "moduleName": "L116-86-500",
+        "fullName": "L116-86-500-B",
+        "folderName": "0318_L116-86-500-B",
+        "fileName": "0318_L116-86-500-B.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Link",
+        "legacy": false
+    },
+    "0319": {
+        "moduleName": "L116-86-650",
+        "fullName": "L116-86-650-B",
+        "folderName": "0319_L116-86-650-B",
+        "fileName": "0319_L116-86-650-B.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Link",
+        "legacy": false
+    },
+    "0320": {
+        "moduleName": "L116-86-800",
+        "fullName": "L116-86-800-B",
+        "folderName": "0320_L116-86-800-B",
+        "fileName": "0320_L116-86-800-B.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Link",
+        "legacy": false
+    },
+    "0321": {
+        "moduleName": "I148-116-400",
+        "fullName": "I148-116-400-B",
+        "folderName": "0321_I148-116-400-B",
+        "fileName": "0321_I148-116-400-B.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Link",
+        "legacy": false
+    },
+    "0322": {
+        "moduleName": "I148-116-600",
+        "fullName": "I148-116-600-B",
+        "folderName": "0322_I148-116-600-B",
+        "fileName": "0322_I148-116-600-B.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Link",
+        "legacy": false
+    },
+    "0323": {
+        "moduleName": "I148-116-800",
+        "fullName": "I148-116-800-B",
+        "folderName": "0323_I148-116-800-B",
+        "fileName": "0323_I148-116-800-B.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Link",
+        "legacy": false
+    },
+    "0324": {
+        "moduleName": "I148-116-1000",
+        "fullName": "I148-116-1000-B",
+        "folderName": "0324_I148-116-1000-B",
+        "fileName": "0324_I148-116-1000-B.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0325": {
+        "moduleName": "L148-116-470",
+        "fullName": "L148-116-470-B",
+        "folderName": "0325_L148-116-470-B",
+        "fileName": "0325_L148-116-470-B.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Link",
+        "legacy": false
+    },
+    "0326": {
+        "moduleName": "L148-116-670",
+        "fullName": "L148-116-670-B",
+        "folderName": "0326_L148-116-670-B",
+        "fileName": "0326_L148-116-670-B.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Link",
+        "legacy": false
+    },
+    "0327": {
+        "moduleName": "L148-116-870",
+        "fullName": "L148-116-870-B",
+        "folderName": "0327_L148-116-870-B",
+        "fileName": "0327_L148-116-870-B.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Link",
+        "legacy": false
+    },
+    "0329": {
+        "moduleName": "L193-148-650",
+        "fullName": "L193-148-650-A",
+        "folderName": "0329_L193-148-650-A",
+        "fileName": "0329_L193-148-650-A.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0330": {
+        "moduleName": "L193-148-800",
+        "fullName": "L193-148-800-A",
+        "folderName": "0330_L193-148-800-A",
+        "fileName": "0330_L193-148-800-A.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0331": {
+        "moduleName": "L193-148-950",
+        "fullName": "L193-148-950-A",
+        "folderName": "0331_L193-148-950-A",
+        "fileName": "0331_L193-148-950-A.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0332": {
+        "moduleName": "L148-116-970",
+        "fullName": "L148-116-970-B",
+        "folderName": "0332_L148-116-970-B",
+        "fileName": "0332_L148-116-970-B.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Link",
+        "legacy": false
+    },
+    "0333": {
+        "moduleName": "L116-116-650",
+        "fullName": "L116-116-650-A",
+        "folderName": "0333_L116-116-650-A",
+        "fileName": "0333_L116-116-650-A.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0334": {
+        "moduleName": "L116-116-500",
+        "fullName": "L116-116-500-A",
+        "folderName": "0334_L116-116-500-A",
+        "fileName": "0334_L116-116-500-A.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0335": {
+        "moduleName": "D193",
+        "fullName": "D193-C",
+        "folderName": "0335_D193-C",
+        "fileName": "0335_D193-C.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Drive",
+        "legacy": true
+    },
+    "0336": {
+        "moduleName": "BD193",
+        "fullName": "BD193-C",
+        "folderName": "0336_BD193-C",
+        "fileName": "0336_BD193-C.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "BaseDrive",
+        "legacy": true
+    },
+    "0337": {
+        "moduleName": "L193-148-650",
+        "fullName": "L193-148-650-B",
+        "folderName": "0337_L193-148-650-B",
+        "fileName": "0337_L193-148-650-B.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Link",
+        "legacy": false
+    },
+    "0338": {
+        "moduleName": "L148-116-710",
+        "fullName": "L148-116-710-B",
+        "folderName": "0338_L148-116-710-B",
+        "fileName": "0338_L148-116-710-B.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0339": {
+        "moduleName": "I116-86-350",
+        "fullName": "I116-86-350-B",
+        "folderName": "0339_I116-86-350-B",
+        "fileName": "0339_I116-86-350-B.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0340": {
+        "moduleName": "L148-116-1070",
+        "fullName": "L148-116-1070-B",
+        "folderName": "0340_L148-116-1070-B",
+        "fileName": "0340_L148-116-1070-B.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Link",
+        "legacy": false
+    },
+    "0341": {
+        "moduleName": "L193-148-500",
+        "fullName": "L193-148-500-B",
+        "folderName": "0341_L193-148-500-B",
+        "fileName": "0341_L193-148-500-B.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Link",
+        "legacy": false
+    },
+    "0342": {
+        "moduleName": "I116-116-160-Orbbec-Camera-Module",
+        "fullName": "I116-116-160-Orbbec-Camera-Module-A",
+        "folderName": "0342_I116-116-160-Orbbec-Camera-Module-A",
+        "fileName": "0342_I116-116-160-Orbbec-Camera-Module-A.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0343": {
+        "moduleName": "I148-116-140",
+        "fullName": "I148-116-140-B",
+        "folderName": "0343_I148-116-140-B",
+        "fileName": "0343_I148-116-140-B.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0344": {
+        "moduleName": "I116-116-140",
+        "fullName": "I116-116-140-A",
+        "folderName": "0344_I116-116-140-A",
+        "fileName": "0344_I116-116-140-A.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0345": {
+        "moduleName": "I86-86-150",
+        "fullName": "I86-86-150-B",
+        "folderName": "0345_I86-86-150-B",
+        "fileName": "0345_I86-86-150-B.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0346": {
+        "moduleName": "BD116",
+        "fullName": "BD116-C",
+        "folderName": "0346_BD116-C",
+        "fileName": "0346_BD116-C.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "BaseDrive",
+        "legacy": false
+    },
+    "0347": {
+        "moduleName": "BD148",
+        "fullName": "BD148-C",
+        "folderName": "0347_BD148-C",
+        "fileName": "0347_BD148-C.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "BaseDrive",
+        "legacy": false
+    },
+    "0348": {
+        "moduleName": "L193-148-1100",
+        "fullName": "L193-148-1100-B",
+        "folderName": "0348_L193-148-1100-B",
+        "fileName": "0348_L193-148-1100-B.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Link",
+        "legacy": false
+    },
+    "0349": {
+        "moduleName": "L193-148-800",
+        "fullName": "L193-148-800-B",
+        "folderName": "0349_L193-148-800-B",
+        "fileName": "0349_L193-148-800-B.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Link",
+        "legacy": false
+    },
+    "0350": {
+        "moduleName": "L193-148-950",
+        "fullName": "L193-148-950-B",
+        "folderName": "0350_L193-148-950-B",
+        "fileName": "0350_L193-148-950-B.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Link",
+        "legacy": false
+    },
+    "0351": {
+        "moduleName": "D193",
+        "fullName": "D193-D.1",
+        "folderName": "0351_D193-D.1",
+        "fileName": "0351_D193-D.1.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Drive",
+        "legacy": false
+    },
+    "0352": {
+        "moduleName": "BD193",
+        "fullName": "BD193-D.1",
+        "folderName": "0352_BD193-D.1",
+        "fileName": "0352_BD193-D.1.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "BaseDrive",
+        "legacy": false
+    },
+    "0353": {
+        "moduleName": "D193",
+        "fullName": "D193-D.2",
+        "folderName": "0353_D193-D.2",
+        "fileName": "0353_D193-D.2.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Drive",
+        "legacy": true
+    },
+    "0354": {
+        "moduleName": "BD193",
+        "fullName": "BD193-D.2",
+        "folderName": "0354_BD193-D.2",
+        "fileName": "0354_BD193-D.2.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "BaseDrive",
+        "legacy": true
+    },
+    "0355": {
+        "moduleName": "L86-86-BlackCam-Custom-Link",
+        "fullName": "L86-86-BlackCam-Custom-Link",
+        "folderName": "0355_L86-86-BlackCam-Custom-Link",
+        "fileName": "0355_L86-86-BlackCam-Custom-Link.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0357": {
+        "moduleName": "L86-86-500",
+        "fullName": "L86-86-500-B",
+        "folderName": "0357_L86-86-500",
+        "fileName": "0357_L86-86-500.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0358": {
+        "moduleName": "L86-86-BlackCam-Custom-Link-FR7-v2",
+        "fullName": "L86-86-BlackCam-Custom-Link-FR7-v2",
+        "folderName": "0358_L86-86-BlackCam-Custom-Link-FR7-v2",
+        "fileName": "0358_L86-86-BlackCam-Custom-Link-FR7-v2.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Link",
+        "legacy": true
+    },
+    "0800": {
+        "moduleName": "E-generic-IO",
+        "fullName": "E-generic-IO",
+        "folderName": "0800_E-generic-IO",
+        "fileName": "0800_E-generic-IO.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Tool",
+        "legacy": true
+    },
+    "0801": {
+        "moduleName": "E-Schmalz-ECBPMi",
+        "fullName": "E-Schmalz-ECBPMi",
+        "folderName": "0801_E-Schmalz-ECBPMi",
+        "fileName": "0801_E-Schmalz-ECBPMi.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Tool",
+        "legacy": true
+    },
+    "0802": {
+        "moduleName": "E-Zimmer-GEP2006IO-00-B",
+        "fullName": "E-Zimmer-GEP2006IO-00-B",
+        "folderName": "0802_E-Zimmer-GEP2006IO-00-B",
+        "fileName": "0802_E-Zimmer-GEP2006IO-00-B.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Tool",
+        "legacy": true
+    },
+    "0803": {
+        "moduleName": "E-Weiss-cr_easy_cig_200-030",
+        "fullName": "E-Weiss-cr_easy_cig_200-030",
+        "folderName": "0803_E-Weiss-cr_easy_cig_200-030",
+        "fileName": "0803_E-Weiss-cr_easy_cig_200-030.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Tool",
+        "legacy": true
+    },
+    "0804": {
+        "moduleName": "E-simple-ISO50",
+        "fullName": "E-simple-ISO50",
+        "folderName": "0804_E-simple-ISO50",
+        "fileName": "0804_E-simple-ISO50.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Tool",
+        "legacy": true
+    },
+    "0805": {
+        "moduleName": "E-simple-vacuum-90deg",
+        "fullName": "E-simple-vacuum-90deg",
+        "folderName": "0805_E-simple-vacuum-90deg",
+        "fileName": "0805_E-simple-vacuum-90deg.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Tool",
+        "legacy": true
+    },
+    "0806": {
+        "moduleName": "E-Piab-VGS4005-SX12",
+        "fullName": "E-Piab-VGS4005-SX12",
+        "folderName": "0806_E-Piab-VGS4005-SX12",
+        "fileName": "0806_E-Piab-VGS4005-SX12.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Tool",
+        "legacy": true
+    },
+    "0807": {
+        "moduleName": "E-Zimmer-GEP5008IO-00-A_ultrasonic",
+        "fullName": "E-Zimmer-GEP5008IO-00-A_ultrasonic",
+        "folderName": "0807_E-Zimmer-GEP5008IO-00-A_ultrasonic",
+        "fileName": "0807_E-Zimmer-GEP5008IO-00-A_ultrasonic.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Tool",
+        "legacy": true
+    },
+    "0808": {
+        "moduleName": "E-simple-vacuum-180deg",
+        "fullName": "E-simple-vacuum-180deg",
+        "folderName": "0808_E-simple-vacuum-180deg",
+        "fileName": "0808_E-simple-vacuum-180deg.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Tool",
+        "legacy": true
+    },
+    "0809": {
+        "moduleName": "E-Gimatic-SZ32-NC",
+        "fullName": "E-Gimatic-SZ32-NC",
+        "folderName": "0809_E-Gimatic-SZ32-NC",
+        "fileName": "0809_E-Gimatic-SZ32-NC.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Tool",
+        "legacy": true
+    },
+    "0810": {
+        "moduleName": "E-Zimmer-GEP2006IO-45-B_ultrasonic",
+        "fullName": "E-Zimmer-GEP2006IO-45-B_ultrasonic",
+        "folderName": "0810_E-Zimmer-GEP2006IO-45-B_ultrasonic",
+        "fileName": "0810_E-Zimmer-GEP2006IO-45-B_ultrasonic.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Tool",
+        "legacy": true
+    },
+    "0811": {
+        "moduleName": "E-Schmalz-ECBPi",
+        "fullName": "E-Schmalz-ECBPi",
+        "folderName": "0811_E-Schmalz-ECBPi",
+        "fileName": "0811_E-Schmalz-ECBPi.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Tool",
+        "legacy": true
+    },
+    "0812": {
+        "moduleName": "E-ISO50-IO-3xM8",
+        "fullName": "E-ISO50-IO-3xM8",
+        "folderName": "0812_E-ISO50-IO-3xM8",
+        "fileName": "0812_E-ISO50-IO-3xM8.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Tool",
+        "legacy": true
+    },
+    "0813": {
+        "moduleName": "E-Weiss-cr_easy_cig_200-030_ultrasonic",
+        "fullName": "E-Weiss-cr_easy_cig_200-030_ultrasonic",
+        "folderName": "0813_E-Weiss-cr_easy_cig_200-030_ultrasonic",
+        "fileName": "0813_E-Weiss-cr_easy_cig_200-030_ultrasonic.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Tool",
+        "legacy": true
+    },
+    "0814": {
+        "moduleName": "E-Schmalz-ECBPMi_ultrasonic",
+        "fullName": "E-Schmalz-ECBPMi_ultrasonic",
+        "folderName": "0814_E-Schmalz-ECBPMi_ultrasonic",
+        "fileName": "0814_E-Schmalz-ECBPMi_ultrasonic.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Tool",
+        "legacy": true
+    },
+    "0815": {
+        "moduleName": "E-ISO50-IO-generic",
+        "fullName": "E-ISO50-IO-generic",
+        "folderName": "0815_E-ISO50-IO-generic",
+        "fileName": "0815_E-ISO50-IO-generic.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Tool",
+        "legacy": true
+    },
+    "0816": {
+        "moduleName": "E-Profile-Clamp",
+        "fullName": "E-Profile-Clamp",
+        "folderName": "0816_E-Profile-Clamp",
+        "fileName": "0816_E-Profile-Clamp.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Tool",
+        "legacy": true
+    },
+    "0817": {
+        "moduleName": "E-simple-ISO50-aluminum",
+        "fullName": "E-simple-ISO50-aluminum",
+        "folderName": "0817_E-simple-ISO50-aluminum",
+        "fileName": "0817_E-simple-ISO50-aluminum.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Tool",
+        "legacy": true
+    },
+    "0903": {
+        "moduleName": "E-gimatic-vacuum",
+        "fullName": "E-gimatic-vacuum",
+        "folderName": "0903_E-gimatic-vacuum",
+        "fileName": "0903_E-gimatic-vacuum.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Tool",
+        "legacy": true
+    },
+    "0904": {
+        "moduleName": "E-ECBPMi-fraunhofer",
+        "fullName": "E-ECBPMi-fraunhofer",
+        "folderName": "0904_E-ECBPMi-fraunhofer",
+        "fileName": "0904_E-ECBPMi-fraunhofer.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Tool",
+        "legacy": true
+    },
+    "0906": {
+        "moduleName": "E-gimatic-sz25-koch",
+        "fullName": "E-gimatic-sz25-koch",
+        "folderName": "0906_E-gimatic-sz25-koch",
+        "fileName": "0906_E-gimatic-sz25-koch.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Tool",
+        "legacy": true
+    },
+    "0907": {
+        "moduleName": "E-perfecdos",
+        "fullName": "E-perfecdos",
+        "folderName": "0907_E-perfecdos",
+        "fileName": "0907_E-perfecdos.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Tool",
+        "legacy": true
+    },
+    "0940": {
+        "moduleName": "E-EoPTestLoadDevice-4000g",
+        "fullName": "E-EoPTestLoadDevice-4000g",
+        "folderName": "0940_E-EoPTestLoadDevice-4000g",
+        "fileName": "0940_E-EoPTestLoadDevice-4000g.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Tool",
+        "legacy": true
+    },
+    "0941": {
+        "moduleName": "E-Schunk-EMH-RP-045-B",
+        "fullName": "E-Schunk-EMH-RP-045-B",
+        "folderName": "0941_E-Schunk-EMH-RP-045-B",
+        "fileName": "0941_E-Schunk-EMH-RP-045-B.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Tool",
+        "legacy": true
+    },
+    "0942": {
+        "moduleName": "E-Zimmer_LSX25-100",
+        "fullName": "E-Zimmer_LSX25-100",
+        "folderName": "0942_E-Zimmer_LSX25-100",
+        "fileName": "0942_E-Zimmer_LSX25-100.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Tool",
+        "legacy": true
+    },
+    "1000": {
+        "moduleName": "E86-Simple-ISO50",
+        "fullName": "E86-Simple-ISO50-B",
+        "folderName": "1000_E86-Simple-ISO50-B",
+        "fileName": "1000_E86-Simple-ISO50-B.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Tool",
+        "legacy": true
+    },
+    "1001": {
+        "moduleName": "E86-IO-Base",
+        "fullName": "E86-IO-Base-B",
+        "folderName": "1001_E86-IO-Base-B",
+        "fileName": "1001_E86-IO-Base-B.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Tool",
+        "legacy": false
+    },
+    "1002": {
+        "moduleName": "E86-IO-ISO50",
+        "fullName": "E86-IO-ISO50-A",
+        "folderName": "1002_E86-IO-ISO50-A",
+        "fileName": "1002_E86-IO-ISO50-A.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Tool",
+        "legacy": false
+    },
+    "1003": {
+        "moduleName": "E116-Simple-ISO80",
+        "fullName": "E116-Simple-ISO80-A",
+        "folderName": "1003_E116-Simple-ISO80-A",
+        "fileName": "1003_E116-Simple-ISO80-A.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Tool",
+        "legacy": true
+    },
+    "1004": {
+        "moduleName": "E116-IO-Base",
+        "fullName": "E116-IO-Base-A",
+        "folderName": "1004_E116-IO-Base-A",
+        "fileName": "1004_E116-IO-Base-A.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Tool",
+        "legacy": false
+    },
+    "1005": {
+        "moduleName": "E116-RobBusEndpoint",
+        "fullName": "E116-RobBusEndpoint",
+        "folderName": "1005_E116-RobBusEndpoint",
+        "fileName": "1005_E116-RobBusEndpoint.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Tool",
+        "legacy": true
+    },
+    "1006": {
+        "moduleName": "E116-IO-ISO80",
+        "fullName": "E116-IO-ISO80-A",
+        "folderName": "1006_E116-IO-ISO80-A",
+        "fileName": "1006_E116-IO-ISO80-A.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Tool",
+        "legacy": false
+    },
+    "1007": {
+        "moduleName": "E116-Simple-ISO80",
+        "fullName": "E116-Simple-ISO80-B",
+        "folderName": "1007_E116-Simple-ISO80-B",
+        "fileName": "1007_E116-Simple-ISO80-B.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Tool",
+        "legacy": false
+    },
+    "1008": {
+        "moduleName": "E86-Simple-ISO50",
+        "fullName": "E86-Simple-ISO50-C",
+        "folderName": "1008_E86-Simple-ISO50-C",
+        "fileName": "1008_E86-Simple-ISO50-C.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Tool",
+        "legacy": false
+    },
+    "1009": {
+        "moduleName": "E86-RobBusEndpoint",
+        "fullName": "E86-RobBusEndpoint",
+        "folderName": "1009_E86-RobBusEndpoint",
+        "fileName": "1009_E86-RobBusEndpoint.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Tool",
+        "legacy": true
+    },
+    "1010": {
+        "moduleName": "E148-RobBusEndpoint",
+        "fullName": "E148-RobBusEndpoint",
+        "folderName": "1010_E148-RobBusEndpoint",
+        "fileName": "1010_E148-RobBusEndpoint.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Tool",
+        "legacy": true
+    },
+    "1011": {
+        "moduleName": "E193-RobBusEndpoint",
+        "fullName": "E193-RobBusEndpoint",
+        "folderName": "1011_E193-RobBusEndpoint",
+        "fileName": "1011_E193-RobBusEndpoint.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Tool",
+        "legacy": true
+    },
+    "1012": {
+        "moduleName": "E86-EtherCatEndpoint",
+        "fullName": "E86-EtherCatEndpoint",
+        "folderName": "1012_E86-EtherCatEndpoint",
+        "fileName": "1012_E86-EtherCatEndpoint.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Tool",
+        "legacy": true
+    },
+    "1013": {
+        "moduleName": "E116-EtherCatEndpoint",
+        "fullName": "E116-EtherCatEndpoint",
+        "folderName": "1013_E116-EtherCatEndpoint",
+        "fileName": "1013_E116-EtherCatEndpoint.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Tool",
+        "legacy": true
+    },
+    "1014": {
+        "moduleName": "E148-EtherCatEndpoint",
+        "fullName": "E148-EtherCatEndpoint",
+        "folderName": "1014_E148-EtherCatEndpoint",
+        "fileName": "1014_E148-EtherCatEndpoint.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Tool",
+        "legacy": true
+    },
+    "1015": {
+        "moduleName": "E193-EtherCatEndpoint",
+        "fullName": "E193-EtherCatEndpoint",
+        "folderName": "1015_E193-EtherCatEndpoint",
+        "fileName": "1015_E193-EtherCatEndpoint.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Tool",
+        "legacy": true
+    },
+    "1016": {
+        "moduleName": "E86-BlackCam-Custom-Tool-angled",
+        "fullName": "E86-BlackCam-Custom-Tool-angled",
+        "folderName": "1016_E86-BlackCam-Custom-Tool-angled",
+        "fileName": "1016_E86-BlackCam-Custom-Tool-angled.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Tool",
+        "legacy": true
+    },
+    "1017": {
+        "moduleName": "E86-BlackCam-Custom-Tool-angled-FR7-v2",
+        "fullName": "E86-BlackCam-Custom-Tool-angled-FR7-v2",
+        "folderName": "1017_E86-BlackCam-Custom-Tool-angled-FR7-v2",
+        "fileName": "1017_E86-BlackCam-Custom-Tool-angled-FR7-v2.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Tool",
+        "legacy": true
+    },
+    "8000": {
+        "moduleName": "C86",
+        "fullName": "C86",
+        "folderName": "8000_C86",
+        "fileName": "8000_C86.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Clamp",
+        "legacy": true
+    },
+    "8001": {
+        "moduleName": "C116-86",
+        "fullName": "C116-86",
+        "folderName": "8001_C116-86",
+        "fileName": "8001_C116-86.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Clamp",
+        "legacy": true
+    },
+    "8002": {
+        "moduleName": "C116",
+        "fullName": "C116",
+        "folderName": "8002_C116",
+        "fileName": "8002_C116.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Clamp",
+        "legacy": true
+    },
+    "8003": {
+        "moduleName": "C148-116",
+        "fullName": "C148-116",
+        "folderName": "8003_C148-116",
+        "fileName": "8003_C148-116.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Clamp",
+        "legacy": true
+    },
+    "8004": {
+        "moduleName": "C148",
+        "fullName": "C148",
+        "folderName": "8004_C148",
+        "fileName": "8004_C148.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Clamp",
+        "legacy": true
+    },
+    "8005": {
+        "moduleName": "C193-148",
+        "fullName": "C193-148",
+        "folderName": "8005_C193-148",
+        "fileName": "8005_C193-148.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Clamp",
+        "legacy": true
+    },
+    "8006": {
+        "moduleName": "C193",
+        "fullName": "C193",
+        "folderName": "8006_C193",
+        "fileName": "8006_C193.json",
+        "isLatestModuleOfName": false,
+        "moduleType": "Clamp",
+        "legacy": true
+    },
+    "8007": {
+        "moduleName": "C86",
+        "fullName": "C86",
+        "folderName": "8007_C86",
+        "fileName": "8007_C86.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Clamp",
+        "legacy": false
+    },
+    "8008": {
+        "moduleName": "C116",
+        "fullName": "C116",
+        "folderName": "8008_C116",
+        "fileName": "8008_C116.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Clamp",
+        "legacy": false
+    },
+    "8009": {
+        "moduleName": "C148",
+        "fullName": "C148",
+        "folderName": "8009_C148",
+        "fileName": "8009_C148.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Clamp",
+        "legacy": false
+    },
+    "8010": {
+        "moduleName": "C193",
+        "fullName": "C193",
+        "folderName": "8010_C193",
+        "fileName": "8010_C193.json",
+        "isLatestModuleOfName": true,
+        "moduleType": "Clamp",
+        "legacy": false
+    }
+}

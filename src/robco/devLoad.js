@@ -32,10 +32,11 @@ function parseIds(csv, fallback) {
     return csv.split(',').map((s) => s.trim()).filter(Boolean);
 }
 
-// Hide the original robot_viewer chrome (top bar, side panels, editor, etc.) so only the
-// 3D canvas + RobCo panels remain. `?chrome=1` keeps the original UI.
-function hideOriginalChrome() {
-    if (document.getElementById('robco-hide-chrome')) return;
+// Remove the original robot_viewer chrome from the DOM (top bar, side panels, editor, etc.)
+// so only the 3D canvas + RobCo panels remain — a clean base for redesigning our UI. It's
+// hidden from first paint by an inline script in index.html (no flash); here we delete it.
+// All of main.js's post-init references to these are null-guarded. `?chrome=1` keeps it.
+function removeOriginalChrome() {
     const ids = [
         'top-control-bar', 'floating-files-panel', 'floating-joints-panel',
         'floating-model-tree', 'floating-help-panel', 'mujoco-simulation-bar',
@@ -43,10 +44,7 @@ function hideOriginalChrome() {
         'help-button', 'code-editor-panel', 'code-editor-wrapper',
         'joints-panel', 'joint-controls-panel', 'graph-panel', 'model-graph-panel',
     ];
-    const style = document.createElement('style');
-    style.id = 'robco-hide-chrome';
-    style.textContent = ids.map((id) => `#${id}`).join(',') + '{display:none !important;}';
-    document.head.appendChild(style);
+    ids.forEach((id) => document.getElementById(id)?.remove());
 }
 
 function addConnectButton(app) {
@@ -67,7 +65,7 @@ function addConnectButton(app) {
 
 export async function maybeLoadRobCo(app) {
     const params = new URLSearchParams(location.search);
-    if (params.get('chrome') !== '1') hideOriginalChrome();
+    if (params.get('chrome') !== '1') removeOriginalChrome();
     addConnectButton(app);
     if (!params.has('robco')) return;
     const mode = params.get('robco');

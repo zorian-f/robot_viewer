@@ -23,6 +23,20 @@
             }
         })();
     </script>
+    <!-- RobCo viewer: hide the original robot_viewer chrome from first paint (no flash).
+         devLoad.js then removes these elements from the DOM. Use ?chrome=1 to keep the original UI. -->
+    <script>
+        (function () {
+            try {
+                if (new URLSearchParams(window.location.search).get('chrome') === '1') return;
+                var ids = ['top-control-bar', 'floating-files-panel', 'floating-joints-panel',
+                    'floating-model-tree', 'floating-help-panel', 'mujoco-simulation-bar', 'hover-info',
+                    'drop-zone', 'bottom-help-bar', 'copyright-watermark', 'help-button',
+                    'code-editor-panel', 'code-editor-wrapper'];
+                document.write('<style>' + ids.map(function (i) { return '#' + i; }).join(',') + '{display:none !important;}</style>');
+            } catch (e) { /* noop */ }
+        })();
+    </script>
     <style>
         :root {
             /* Apple Glass Design System */

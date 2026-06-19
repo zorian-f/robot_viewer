@@ -45,6 +45,14 @@ export async function enhanceVisuals(model, sm) {
         }
     });
 
+    // Render Settings panel (lets the user dial exposure / env / lights / shadows live).
+    try {
+        const { RenderSettingsPanel } = await import('./RenderSettingsPanel.js');
+        RenderSettingsPanel.ensure(sm).applyAll();
+    } catch (e) {
+        console.warn('[RobCo] render settings panel failed:', e);
+    }
+
     sm.redraw?.();
     sm.render?.();
 }

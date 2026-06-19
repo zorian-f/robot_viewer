@@ -33,7 +33,7 @@ export async function connectLiveSession(app, opts) {
     // Stream-rate meter: timestamp every frame off the socket (with event.timeStamp), measure
     // the jointAngles push cadence. Tap is passive — never touches the per-type handlers.
     const meter = new FrequencyMeter({ type: 'jointAngles', sampleSize: 300, warmup: 20 });
-    socket.addTap((type, data, ts) => meter.tick(type, data, ts));
+    socket.addTap((type, data, ts, recvNow) => meter.tick(type, data, ts, recvNow));
     StreamRatePanel.ensure(meter);
     app._robcoStreamMeter = meter;
     let model = null;

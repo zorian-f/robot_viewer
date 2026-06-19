@@ -168,7 +168,11 @@ export class StreamRatePanel {
             ['samples', `${r.n}  (${r.windowSeconds.toFixed(1)} s)`],
             ['regime', r.regime],
             ['changed/arrival', `${(r.changedRatio * 100).toFixed(0)}%`],
+            ['within ±20% of mean', `${(r.centralFraction * 100).toFixed(0)}%`],
         ];
+        if (r.lagN > 0) {
+            rows.push(['dispatch lag mean/p95', `${r.lagMeanMs.toFixed(1)} / ${r.lagP95Ms.toFixed(1)} ms`]);
+        }
         const grid = el('div', 'display:grid;grid-template-columns:auto 1fr;gap:1px 10px;margin-top:6px;font-size:11px;');
         for (const [k, v] of rows) {
             grid.append(el('span', 'color:#6e7681;', k));
@@ -195,6 +199,14 @@ export class StreamRatePanel {
         const axis = el('div', 'display:flex;justify-content:space-between;font-size:9px;color:#6e7681;margin-top:1px;');
         axis.append(el('span', null, `${h.lo.toFixed(0)} ms`), el('span', null, `${h.hi.toFixed(0)} ms`), el('span', null, '>p99'));
         this._report.append(axis);
+
+        // shape diagnosis (unimodal vs bimodal/bursty + likely cause)
+        const shapeColor = r.shape === 'unimodal' ? '#3fb950' : '#d29922';
+        const diag = el('div',
+            `margin-top:8px;font-size:10px;color:#cdd6e0;border-left:2px solid ${shapeColor};padding-left:6px;`);
+        diag.append(el('span', `font-weight:600;color:${shapeColor};`, `${r.shape}: `));
+        diag.append(document.createTextNode(r.diagnosis));
+        this._report.append(diag);
 
         // instrument note
         const res = r.crossOriginIsolated ? '~5–100 µs (COOP/COEP on)' : '~100 µs–1 ms (timer clamped)';

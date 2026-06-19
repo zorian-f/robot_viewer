@@ -64,6 +64,7 @@ export class FrequencyMeter {
         this._lastVec = null;
         this._deltas = [];
         this._changed = [];
+        this._lags = []; // dispatch lag (recv − event.timeStamp) per recorded sample, ms
         this._warmupLeft = this.warmup;
         this._windowInvalid = false;
         this._arrivals = 0;
@@ -105,10 +106,17 @@ export class FrequencyMeter {
      * Record one arrival. Call from the WS onmessage path.
      * @param {string} type
      * @param {*} data   - payload (array of joint degrees for 'jointAngles').
-     * @param {number} tsMs - high-res arrival timestamp (event.timeStamp || performance.now()).
+     * @param {number} tsMs - event-creation timestamp (event.timeStamp || performance.now()).
+     * @param {number} [recvMs] - performance.now() when the handler ran; recvMs − tsMs is the
+     *   main-thread dispatch lag (0/absent when event.timeStamp was unavailable).
      */
-    tick(type, data, tsMs) {
+    tick(type, data, tsMs, recvMs) {
         if (typeof tsMs !== 'number') tsMs = (typeof performance !== 'undefined' ? performance.now() : 0);
+        // Dispatch lag, only when comparable (same timeline, non-negative, not absurd).
+        const lag =
+            typeof recvMs === 'number' && recvMs >= tsMs && recvMs - tsMs < 10000
+                ? recvMs - tsMs
+                : null;
 
         // Context rate across every message type (rolling).
         if (this._totalLastTs != null) {
@@ -151,9 +159,11 @@ export class FrequencyMeter {
                 } else {
                     this._deltas.push(delta);
                     this._changed.push(changed);
+                    this._lags.push(lag);
                     if (this._deltas.length > this.capacity) {
                         this._deltas.shift();
                         this._changed.shift();
+                        this._lags.shift();
                     }
                     if (this._capture) {
                         this._capture.count += 1;
@@ -222,6 +232,36 @@ export class FrequencyMeter {
         else if (jitterPct < 0.3) quality = 'fair';
         else quality = 'noisy';
 
+        // Dispatch lag (recv − event creation): high lag ⇒ main-thread stalls (local coalescing).
+        const lags = this._lags.filter((x) => typeof x === 'number');
+        const lagN = lags.length;
+        let lagMeanMs = 0;
+        let lagP95Ms = 0;
+        let lagMaxMs = 0;
+        if (lagN) {
+            const ls = [...lags].sort((a, b) => a - b);
+            lagMeanMs = ls.reduce((a, b) => a + b, 0) / lagN;
+            lagP95Ms = ls[Math.min(lagN - 1, Math.round(0.95 * (lagN - 1)))];
+            lagMaxMs = ls[lagN - 1];
+        }
+
+        // Shape: a unimodal cadence keeps most samples near the mean; a bursty/bimodal stream
+        // (cluster near 0 + a gap peak) leaves few samples in the ±20% central band.
+        const within = deltas.filter((d) => d >= 0.8 * mean && d <= 1.2 * mean).length;
+        const centralFraction = within / n;
+        let shape;
+        let diagnosis;
+        if (centralFraction >= 0.6) {
+            shape = 'unimodal';
+            diagnosis = 'single clean cadence';
+        } else {
+            shape = 'bimodal';
+            const stalls = lagN >= 5 && lagP95Ms > 8;
+            diagnosis = stalls
+                ? 'bursty + high dispatch lag → main-thread coalescing (render/GC); true wire rate is likely steadier — pause interaction or run the WS in a worker'
+                : 'bursty + low dispatch lag → batching upstream (cloud proxy / network), not this tab';
+        }
+
         // Histogram over [min, p99] with a final overflow bin (so one GC pause can't stretch it).
         const lo = sorted[0];
         const p99 = at(0.99);
@@ -255,6 +295,13 @@ export class FrequencyMeter {
             regime,
             quality,
             windowSeconds: sum / 1000,
+            lagMeanMs,
+            lagP95Ms,
+            lagMaxMs,
+            lagN,
+            centralFraction,
+            shape,
+            diagnosis,
             histogram: { lo, hi: p99, bins, counts },
         };
     }

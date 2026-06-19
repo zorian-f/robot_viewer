@@ -78,10 +78,12 @@ export class RobFlowSocket {
             this._statusHandler?.('open', this.wsUrl);
         };
         ws.onmessage = (event) => {
-            // Stamp arrival as early as possible. event.timeStamp is a DOMHighResTimeStamp on
-            // the same monotonic timeline as performance.now(), but closer to event creation
-            // (less handler-scheduling jitter); fall back to performance.now() if unavailable.
-            const ts = event.timeStamp > 0 ? event.timeStamp : performance.now();
+            // recvNow = when our handler actually ran; ts = when the event was created
+            // (event.timeStamp, a DOMHighResTimeStamp on the same timeline as performance.now()
+            // but closer to wire arrival). recvNow - ts is the main-thread dispatch lag, which
+            // reveals whether bursty deltas are local coalescing vs upstream batching.
+            const recvNow = performance.now();
+            const ts = event.timeStamp > 0 ? event.timeStamp : recvNow;
             let msg;
             try {
                 msg = JSON.parse(event.data);
@@ -92,7 +94,7 @@ export class RobFlowSocket {
             this._anyHandler?.(msg.type, msg.data, ts);
             for (const tap of this._taps) {
                 try {
-                    tap(msg.type, msg.data, ts);
+                    tap(msg.type, msg.data, ts, recvNow);
                 } catch {
                     /* a tap must never break dispatch */
                 }

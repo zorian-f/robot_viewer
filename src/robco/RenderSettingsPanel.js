@@ -14,7 +14,7 @@ const TONE = {
     Reinhard: THREE.ReinhardToneMapping,
     Cineon: THREE.CineonToneMapping,
 };
-const KEY = 'robco-render-settings';
+const KEY = 'robco-render-settings-v2'; // bumped so the RobCo-style defaults take effect
 // Defaults match RobCo Studio's visualizer: warm-white background, ACES tone mapping,
 // IBL/environment-dominant lighting with a soft directional key.
 const DEFAULTS = { exposure: 1.0, envIntensity: 1.2, tone: 'ACES', keyLight: 0.6, ambient: 0.35, shadows: true, background: '#FCF9F7' };

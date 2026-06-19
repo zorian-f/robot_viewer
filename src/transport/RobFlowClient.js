@@ -30,10 +30,17 @@ export class RobFlowClient {
         const res = await fetch(`${this.restBase}${path}`, {
             method: 'PUT',
             headers: this._headers(),
-            credentials: 'include',
+            // The API returns Access-Control-Allow-Origin: *, which the browser rejects with
+            // credentials:'include'. Auth is the Bearer token, so omit credentials.
+            credentials: 'omit',
             body: body !== undefined ? JSON.stringify(body) : undefined,
         });
-        if (!res.ok) throw new Error(`PUT ${path} → HTTP ${res.status}`);
+        if (!res.ok) {
+            const detail = res.status === 401 || res.status === 403
+                ? ' (missing/expired token, or robot not in TEACH mode)'
+                : '';
+            throw new Error(`PUT ${path} → HTTP ${res.status}${detail}`);
+        }
         return res.status;
     }
 

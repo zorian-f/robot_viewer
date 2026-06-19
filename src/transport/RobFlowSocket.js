@@ -24,6 +24,7 @@ export class RobFlowSocket {
         this.ws = null;
         this._handlers = new Map(); // type -> fn(data, fullMessage)
         this._anyHandler = null;
+        this._taps = []; // fn(type, data, tsMs) — multiple non-exclusive observers
         this._statusHandler = null;
         this._stopped = false;
         this._attempt = 0;
@@ -36,10 +37,24 @@ export class RobFlowSocket {
         return this;
     }
 
-    /** Handler called for every message: fn(type, data). */
+    /** Handler called for every message: fn(type, data). Single-owner (last wins). */
     onAny(fn) {
         this._anyHandler = fn;
         return this;
+    }
+
+    /**
+     * Register a passive observer called for every frame with a high-resolution arrival
+     * timestamp: fn(type, data, tsMs). Multiple taps are allowed (unlike onAny) and they
+     * never interfere with the per-type handlers — used for the stream-rate meter.
+     * @returns {() => void} unsubscribe
+     */
+    addTap(fn) {
+        this._taps.push(fn);
+        return () => {
+            const i = this._taps.indexOf(fn);
+            if (i >= 0) this._taps.splice(i, 1);
+        };
     }
 
     /** Handler called on connection lifecycle: fn('open'|'close'|'error', detail). */
@@ -63,6 +78,10 @@ export class RobFlowSocket {
             this._statusHandler?.('open', this.wsUrl);
         };
         ws.onmessage = (event) => {
+            // Stamp arrival as early as possible. event.timeStamp is a DOMHighResTimeStamp on
+            // the same monotonic timeline as performance.now(), but closer to event creation
+            // (less handler-scheduling jitter); fall back to performance.now() if unavailable.
+            const ts = event.timeStamp > 0 ? event.timeStamp : performance.now();
             let msg;
             try {
                 msg = JSON.parse(event.data);
@@ -70,7 +89,14 @@ export class RobFlowSocket {
                 return;
             }
             if (!msg || typeof msg.type !== 'string') return;
-            this._anyHandler?.(msg.type, msg.data);
+            this._anyHandler?.(msg.type, msg.data, ts);
+            for (const tap of this._taps) {
+                try {
+                    tap(msg.type, msg.data, ts);
+                } catch {
+                    /* a tap must never break dispatch */
+                }
+            }
             const fn = this._handlers.get(msg.type);
             if (fn) fn(msg.data, msg);
         };

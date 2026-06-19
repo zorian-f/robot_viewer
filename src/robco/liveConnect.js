@@ -7,6 +7,8 @@
 import { resolveSession } from '../transport/session.js';
 import { RobFlowSocket } from '../transport/RobFlowSocket.js';
 import { RobFlowClient } from '../transport/RobFlowClient.js';
+import { FrequencyMeter } from '../transport/FrequencyMeter.js';
+import { StreamRatePanel } from './StreamRatePanel.js';
 import { RobCoModuleAdapter } from '../adapters/RobCoModuleAdapter.js';
 import { applyAnglesDeg, applyBaseShift } from './poseUtils.js';
 import { DynamicsController } from '../dynamics/DynamicsController.js';
@@ -27,6 +29,13 @@ export async function connectLiveSession(app, opts) {
     const client = new RobFlowClient(session.restBase, { token: opts.token });
     const panel = new RobFlowToolsPanel(app, { client });
     const socket = new RobFlowSocket(session.wsUrl);
+
+    // Stream-rate meter: timestamp every frame off the socket (with event.timeStamp), measure
+    // the jointAngles push cadence. Tap is passive — never touches the per-type handlers.
+    const meter = new FrequencyMeter({ type: 'jointAngles', sampleSize: 300, warmup: 20 });
+    socket.addTap((type, data, ts) => meter.tick(type, data, ts));
+    StreamRatePanel.ensure(meter);
+    app._robcoStreamMeter = meter;
     let model = null;
     let building = false;
     let latestAngles = null;
@@ -106,7 +115,11 @@ export async function connectLiveSession(app, opts) {
     socket.on('robotState', (d) => panel.setStates({ robotState: d }));
     socket.on('operationMode', (d) => panel.setStates({ operationMode: d }));
     socket.on('safetyState', (d) => panel.setStates({ safetyState: d }));
-    socket.onStatus((state) => panel.setWs(state === 'open'));
+    socket.onStatus((state) => {
+        panel.setWs(state === 'open');
+        // Don't average a connection gap into the rate; resume cleanly on (re)connect.
+        meter.breakGap();
+    });
 
     socket.connect();
     app._robflowSocket = socket; // keep a handle for teardown/debugging

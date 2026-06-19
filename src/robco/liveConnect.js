@@ -9,6 +9,7 @@ import { RobFlowSocket } from '../transport/RobFlowSocket.js';
 import { RobCoModuleAdapter } from '../adapters/RobCoModuleAdapter.js';
 import { applyAnglesDeg, applyBaseShift } from './poseUtils.js';
 import { DynamicsController } from '../dynamics/DynamicsController.js';
+import { TeachPendant } from './TeachPendant.js';
 
 const redactSid = (url) => url.replace(/session\/ws\/[^/]+/, 'session/ws/<SID>');
 
@@ -27,6 +28,7 @@ export async function connectLiveSession(app, opts) {
     let latestAngles = null;
     let latestBaseShift = null;
     let dynamics = null;
+    let teach = null;
     let pendingPayload = null;
 
     socket.on('robotModuleIds', async (ids) => {
@@ -55,6 +57,13 @@ export async function connectLiveSession(app, opts) {
             } catch (e) {
                 console.error('[RobCo] dynamics dashboard failed:', e);
             }
+
+            // Teach pendant (drag gizmo -> IK preview). Pauses the mirror while teaching.
+            try {
+                teach = await TeachPendant.attach(app, model);
+            } catch (e) {
+                console.error('[RobCo] teach pendant failed:', e);
+            }
         } catch (err) {
             console.error('[RobCo] live build failed:', err);
             building = false;
@@ -63,8 +72,10 @@ export async function connectLiveSession(app, opts) {
 
     socket.on('jointAngles', (angles) => {
         latestAngles = angles;
-        if (model) applyAnglesDeg(model, angles);
+        // Pause the mirror while teaching so dragging isn't fought by incoming angles.
+        if (model && !app._teachActive) applyAnglesDeg(model, angles);
         if (dynamics) dynamics.update(angles, performance.now());
+        if (teach) teach.syncTcp();
     });
 
     socket.on('baseShift', (bs) => {

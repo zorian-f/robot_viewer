@@ -75,10 +75,14 @@ export function mjcfFromModules(descriptors, opts = {}) {
     const gravity = opts.gravity ?? [0, 0, -9.81];
     const jointNames = [];
 
-    // Inner-most: optional payload body welded at the flange.
+    // Inner-most content, welded at the flange of the last module: a TCP site (for FK /
+    // Jacobian / IK) plus an optional payload body.
     let inner = '';
+    if (opts.tcpSite !== false) {
+        inner += `<site name="tcp" pos="${vec(opts.tcpOffset || [0, 0, 0])}" size="0.01"/>`;
+    }
     if (payloadMass > 0) {
-        inner = `<body name="payload">${inertialXml(payloadMass, null, payloadCom)}</body>`;
+        inner += `<body name="payload">${inertialXml(payloadMass, null, payloadCom)}</body>`;
     }
 
     for (let i = descriptors.length - 1; i >= 0; i--) {

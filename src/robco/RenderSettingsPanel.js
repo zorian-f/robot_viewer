@@ -15,7 +15,9 @@ const TONE = {
     Cineon: THREE.CineonToneMapping,
 };
 const KEY = 'robco-render-settings';
-const DEFAULTS = { exposure: 1.15, envIntensity: 1.25, tone: 'ACES', keyLight: 3.14, ambient: 0.5, shadows: true };
+// Defaults match RobCo Studio's visualizer: warm-white background, ACES tone mapping,
+// IBL/environment-dominant lighting with a soft directional key.
+const DEFAULTS = { exposure: 1.0, envIntensity: 1.2, tone: 'ACES', keyLight: 0.6, ambient: 0.35, shadows: true, background: '#FCF9F7' };
 
 const PANEL_CSS =
     'position:fixed;right:16px;bottom:16px;z-index:3000;width:240px;font:12px/1.4 ui-monospace,Menlo,Consolas,monospace;' +
@@ -81,6 +83,18 @@ export class RenderSettingsPanel {
         tmRow.append(tm);
         body.append(tmRow);
 
+        // Background colour
+        const bgRow = el('div', 'display:flex;align-items:center;gap:8px;margin:5px 0;');
+        bgRow.append(el('span', 'opacity:.8;width:62px;', 'background'));
+        const bg = el('input', 'width:40px;height:22px;background:transparent;border:1px solid rgba(255,255,255,0.15);border-radius:5px;cursor:pointer;padding:0;');
+        bg.type = 'color';
+        bg.value = this.s.background;
+        bg.addEventListener('input', () => { this.s.background = bg.value; this._applyBackground(); this._save(); this.sm.render?.(); });
+        const bgReset = el('button', 'background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);color:#9da7b3;border-radius:5px;cursor:pointer;font:inherit;padding:2px 6px;', 'RobCo');
+        bgReset.addEventListener('click', () => { this.s.background = '#FCF9F7'; bg.value = '#FCF9F7'; this._applyBackground(); this._save(); this.sm.render?.(); });
+        bgRow.append(bg, bgReset);
+        body.append(bgRow);
+
         body.append(this._slider('exposure', 0, 3, 0.05, this.s.exposure, (v) => { this.s.exposure = v; this._applyExposure(); this._save(); this.sm.render?.(); }));
         body.append(this._slider('env IBL', 0, 3, 0.05, this.s.envIntensity, (v) => { this.s.envIntensity = v; this._applyEnv(); this._save(); this.sm.render?.(); }));
         body.append(this._slider('key light', 0, 8, 0.1, this.s.keyLight, (v) => { this.s.keyLight = v; this._applyLights(); this._save(); this.sm.render?.(); }));
@@ -104,6 +118,7 @@ export class RenderSettingsPanel {
     }
 
     // --- apply ----------------------------------------------------------
+    _applyBackground() { if (this.sm.scene) this.sm.scene.background = new THREE.Color(this.s.background); }
     _applyExposure() { this.sm.renderer.toneMappingExposure = this.s.exposure; }
     _applyTone() {
         this.sm.renderer.toneMapping = TONE[this.s.tone] ?? THREE.ACESFilmicToneMapping;
@@ -133,6 +148,7 @@ export class RenderSettingsPanel {
 
     /** Apply all current settings (call after a model (re)loads). */
     applyAll() {
+        this._applyBackground();
         this._applyExposure();
         this._applyTone();
         this._applyEnv();

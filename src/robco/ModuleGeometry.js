@@ -161,8 +161,10 @@ export class RobotModuleNode {
         this._collisionMeshes = [];
         const cv = this.descriptor?.collisions_visuals || {};
         const { STLLoader } = await import('three/examples/jsm/loaders/STLLoader.js');
-        const mat = new THREE.MeshStandardMaterial({
-            color: 0x00e0a0, transparent: true, opacity: 0.35, depthWrite: false, roughness: 0.7,
+        // Translucent overlay drawn on top (depthTest off) so the hull is visible through
+        // the opaque visual meshes rather than occluded inside them.
+        const mat = new THREE.MeshBasicMaterial({
+            color: 0x00e0a0, transparent: true, opacity: 0.4, depthTest: false, depthWrite: false,
         });
         const loadInto = async (file, node) => {
             if (!file) return;
@@ -172,6 +174,7 @@ export class RobotModuleNode {
                 const mesh = new THREE.Mesh(geo, mat);
                 mesh.userData.isCollisionMesh = true;
                 mesh.visible = false;
+                mesh.renderOrder = 999;
                 node.add(mesh);
                 this._collisionMeshes.push(mesh);
             } catch (e) {

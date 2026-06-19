@@ -71,7 +71,9 @@ export class ViewPanel {
             this._collisionLoaded = true;
             if (this._hoverOut) this._hoverOut.textContent = 'loading collision meshes…';
             await Promise.all(nodes.map((n) => n.loadCollision?.()));
-            if (this._hoverOut) this._hoverOut.textContent = '';
+            const count = nodes.reduce((s, n) => s + (n._collisionMeshes?.length || 0), 0);
+            if (this._hoverOut) this._hoverOut.textContent = `collision: ${count} meshes`;
+            console.log(`[RobCo] collision meshes loaded: ${count} from ${nodes.length} modules`);
         }
         nodes.forEach((n) => n.setCollisionVisible?.(on));
         this._render();

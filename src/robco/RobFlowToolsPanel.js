@@ -277,7 +277,6 @@ export class RobFlowToolsPanel {
         if (!this.client || !this.teach) return;
         const deg = this.teach.currentAnglesDeg();
         const v = this._vel.get(), a = this._acc.get(), appr = +this._appr.value;
-        if (!window.confirm(`Send joint move to the robot?\n\n[${deg.map((d) => d.toFixed(1)).join(', ')}] °\nvelocity ${v}, accel ${a}, ${appr === 1 ? 'PTP' : 'Linear'}\n\nThe real robot will move.`)) return;
         this._ik.textContent = 'sending move…';
         try {
             await this.client.moveJointAngles(deg, { velocity: v, acceleration: a, approachMode: appr });

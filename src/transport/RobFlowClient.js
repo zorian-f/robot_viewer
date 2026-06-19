@@ -96,4 +96,30 @@ export class RobFlowClient {
     stop() {
         return this._put('/stop');
     }
+
+    async _post(path, body) {
+        const res = await fetch(`${this.restBase}${path}`, {
+            method: 'POST',
+            headers: this._headers(),
+            credentials: 'omit',
+            body: JSON.stringify(body),
+        });
+        if (!res.ok) throw new Error(`POST ${path} → HTTP ${res.status}`);
+        return res.json();
+    }
+
+    /** POST /flows/ — create a flow; returns the created flow (with uuid). */
+    createFlow(flow) {
+        return this._post('/flows/', flow);
+    }
+
+    /** PUT /flows/{uuid}/run — run an existing flow. */
+    runFlow(uuid) {
+        return this._put(`/flows/${uuid}/run`);
+    }
+
+    /** GET /flows/ — list flows. */
+    listFlows() {
+        return this._get('/flows/');
+    }
 }

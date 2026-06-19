@@ -8,6 +8,7 @@
  * (Send/Control/Status) are hidden when there is no client (static preview).
  */
 import { OPERATION_MODE, ROBOT_STATE, SAFETY_STATE, label, SEVERITY_COLOR, canTeach } from './robcoEnums.js';
+import { buildJointFlow } from '../transport/flowBuilder.js';
 
 const PANEL_CSS =
     'position:fixed;right:16px;top:16px;z-index:3000;width:300px;font:12px/1.45 ui-monospace,Menlo,Consolas,monospace;' +
@@ -46,6 +47,7 @@ export class RobFlowToolsPanel {
         this.teach = teach;
         this.client = client;
         this.states = {};
+        this._waypoints = [];
         this._build();
         if (teach) this.setTeach(teach);
         if (client) this._pingApi();
@@ -123,10 +125,38 @@ export class RobFlowToolsPanel {
         this._enableBtn.addEventListener('click', () => this._control('enable'));
         ctrlStop.addEventListener('click', () => this._control('stop'));
 
+        // --- Waypoints → Flow (needs client) ---
+        this._wpBox = el('div');
+        this._wpBox.append(sectionTitle('Waypoints → Flow'));
+        this._wpCount = el('div', 'opacity:.8;margin-bottom:4px;', '0 captured');
+        this._wpBox.append(this._wpCount);
+        const wpRow = el('div', 'display:flex;gap:6px;');
+        const capBtn = el('button', BTN + 'flex:1;', 'Capture pose');
+        const clrBtn = el('button', BTN, 'Clear');
+        wpRow.append(capBtn, clrBtn);
+        this._wpBox.append(wpRow);
+        const nameRow = el('div', 'display:flex;gap:6px;align-items:center;margin-top:6px;');
+        nameRow.append(el('span', 'opacity:.8;', 'name'));
+        this._flowName = el('input', 'flex:1;background:rgba(255,255,255,0.08);color:#e6edf3;border:1px solid rgba(255,255,255,0.15);border-radius:5px;padding:3px 6px;font:inherit;');
+        this._flowName.value = 'Viewer Flow';
+        nameRow.append(this._flowName);
+        this._wpBox.append(nameRow);
+        const pushRow = el('div', 'display:flex;gap:6px;margin-top:6px;');
+        const pushBtn = el('button', BTN + 'flex:1;', 'Push Flow');
+        const runBtn = el('button', BTN + 'border-color:#3fb950;flex:1;', 'Push & Run');
+        pushRow.append(pushBtn, runBtn);
+        this._wpBox.append(pushRow);
+        root.append(this._wpBox);
+        capBtn.addEventListener('click', () => this._capture());
+        clrBtn.addEventListener('click', () => this._clearWaypoints());
+        pushBtn.addEventListener('click', () => this._pushFlow(false));
+        runBtn.addEventListener('click', () => this._pushFlow(true));
+
         // Hide robot-only sections without a client.
         if (!this.client) {
             this._sendBox.style.display = 'none';
             this._ctrlBox.style.display = 'none';
+            this._wpBox.style.display = 'none';
         }
 
         document.body.appendChild(root);
@@ -224,6 +254,44 @@ export class RobFlowToolsPanel {
     async _pingApi() {
         try { await this.client.getRobotConfig(); this.setApi(true); }
         catch { this.setApi(false); }
+    }
+
+    // --- waypoints / flow ----------------------------------------------
+    _capture() {
+        if (!this.teach) return;
+        this._waypoints.push({ anglesDeg: this.teach.currentAnglesDeg(), name: `P${this._waypoints.length + 1}` });
+        this._wpCount.textContent = `${this._waypoints.length} captured`;
+        this._ik.textContent = `captured P${this._waypoints.length}`;
+    }
+    _clearWaypoints() {
+        this._waypoints = [];
+        this._wpCount.textContent = '0 captured';
+    }
+    async _pushFlow(run) {
+        if (!this.client) return;
+        if (this._waypoints.length === 0) { this._ik.textContent = 'no waypoints captured'; return; }
+        const flow = buildJointFlow(this._flowName.value || 'Viewer Flow', this._waypoints, {
+            velocity: this._vel.get(), acceleration: this._acc.get(),
+        });
+        this._ik.textContent = run ? 'pushing & running flow…' : 'pushing flow…';
+        try {
+            const created = await this.client.createFlow(flow);
+            this.setApi(true);
+            const uuid = created?.uuid ?? created?.id;
+            if (run) {
+                if (!window.confirm(`Run flow "${flow.name}" (${this._waypoints.length} waypoints)?\nThe real robot will move.`)) {
+                    this._ik.textContent = `flow created (not run): ${uuid?.slice(0, 8) || ''}`;
+                    return;
+                }
+                await this.client.runFlow(uuid);
+                this._ik.textContent = 'flow running ✓';
+            } else {
+                this._ik.textContent = `flow created ✓ ${uuid?.slice(0, 8) || ''}`;
+            }
+        } catch (e) {
+            this.setApi(false);
+            this._ik.textContent = `flow failed: ${e.message}`;
+        }
     }
 
     dispose() {

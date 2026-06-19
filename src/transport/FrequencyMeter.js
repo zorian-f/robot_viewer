@@ -259,7 +259,7 @@ export class FrequencyMeter {
             const stalls = lagN >= 5 && lagP95Ms > 8;
             diagnosis = stalls
                 ? 'bursty + high dispatch lag → main-thread coalescing (render/GC); true wire rate is likely steadier — pause interaction or run the WS in a worker'
-                : 'bursty + low dispatch lag → batching upstream (cloud proxy / network), not this tab';
+                : "bursty + low dispatch lag → upstream batching (proxy/network) OR browser pre-dispatch coalescing (event.timeStamp can't see it); confirm the true wire rate with a Web Worker socket";
         }
 
         // Histogram over [min, p99] with a final overflow bin (so one GC pause can't stretch it).

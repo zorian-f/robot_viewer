@@ -31,10 +31,10 @@ export class DynamicsController {
         ctrl.deriv.setOptions(dash.getSettings());
         dash.onSettingsChange = (s) => ctrl.deriv.setOptions(s);
 
-        // TCP payload (kg) -> rebuild the dynamics model with a load at the flange.
-        dash.onPayloadChange = (kg) => ctrl.setPayload(kg);
+        // TCP payload (kg + CoM offset) -> rebuild the dynamics model with a load at the flange.
+        dash.onPayloadChange = (kg, com) => ctrl.setPayload(kg, com);
         const payload0 = dash.getPayload?.() || 0;
-        if (payload0 > 0) ctrl.dyn.setPayload(payload0); // apply persisted load before first compute
+        if (payload0 > 0) ctrl.dyn.setPayload(payload0, dash.getPayloadComMeters?.() || [0, 0, 0]);
 
         return ctrl;
     }

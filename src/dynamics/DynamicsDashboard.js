@@ -28,7 +28,9 @@ export class DynamicsDashboard {
         /** @type {?(kg:number)=>void} */
         this.onPayloadChange = null;
         this.settings = DynamicsDashboard._loadSettings();
-        this._payloadKg = DynamicsDashboard._loadPayload();
+        const pay = DynamicsDashboard._loadPayload();
+        this._payloadKg = pay.kg;
+        this._payloadCom = pay.com; // CoM offset from the flange/TCP, in mm
         this._build(parent);
     }
 
@@ -36,17 +38,24 @@ export class DynamicsDashboard {
         return this._payloadKg;
     }
 
-    static _loadPayload() {
-        try {
-            const v = parseFloat(localStorage.getItem('robco-tcp-payload'));
-            return Number.isFinite(v) ? Math.max(0, v) : 0;
-        } catch {
-            return 0;
-        }
+    /** CoM offset converted to metres (what MujocoDynamics.setPayload expects). */
+    getPayloadComMeters() {
+        return this._payloadCom.map((v) => v / 1000);
     }
 
-    static _savePayload(v) {
-        try { localStorage.setItem('robco-tcp-payload', String(v)); } catch { /* ignore */ }
+    static _loadPayload() {
+        try {
+            const raw = JSON.parse(localStorage.getItem('robco-tcp-payload'));
+            if (typeof raw === 'number') return { kg: Math.max(0, raw), com: [0, 0, 0] }; // legacy
+            if (raw && typeof raw === 'object') {
+                return { kg: Math.max(0, raw.kg || 0), com: Array.isArray(raw.com) ? raw.com : [0, 0, 0] };
+            }
+        } catch { /* ignore */ }
+        return { kg: 0, com: [0, 0, 0] };
+    }
+
+    static _savePayload(kg, com) {
+        try { localStorage.setItem('robco-tcp-payload', JSON.stringify({ kg, com })); } catch { /* ignore */ }
     }
 
     getSettings() {
@@ -86,32 +95,43 @@ export class DynamicsDashboard {
         el.appendChild(title);
         this._title = title;
 
-        // TCP payload (kg) — included in the inverse-dynamics torque / utilization.
-        const payRow = document.createElement('div');
-        payRow.style.cssText = 'display:flex;align-items:center;gap:6px;margin-bottom:8px;font-size:11px;';
-        const payLbl = document.createElement('span');
-        payLbl.textContent = 'TCP load';
-        payLbl.style.opacity = '.8';
-        const payIn = document.createElement('input');
-        payIn.type = 'number';
-        payIn.min = '0';
-        payIn.step = '0.1';
-        payIn.value = String(this._payloadKg);
-        payIn.style.cssText =
-            'width:64px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);' +
-            'border-radius:4px;color:#e6edf3;padding:2px 5px;font:inherit;text-align:right;';
-        const payUnit = document.createElement('span');
-        payUnit.textContent = 'kg';
-        payUnit.style.opacity = '.7';
-        const applyPay = () => {
-            this._payloadKg = Math.max(0, parseFloat(payIn.value) || 0);
-            payIn.value = String(this._payloadKg);
-            DynamicsDashboard._savePayload(this._payloadKg);
-            this.onPayloadChange?.(this._payloadKg);
+        // TCP payload — mass (kg) + CoM offset (mm, flange frame); included in torque / util.
+        const inputCss = 'background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);' +
+            'border-radius:4px;color:#e6edf3;padding:2px 4px;font:inherit;text-align:right;';
+        const numIn = (val, w) => {
+            const i = document.createElement('input');
+            i.type = 'number'; i.step = '1'; i.value = String(val);
+            i.style.cssText = inputCss + `width:${w}px;`;
+            return i;
         };
-        payIn.addEventListener('change', applyPay);
-        payRow.append(payLbl, payIn, payUnit);
-        el.appendChild(payRow);
+        const dim = (t) => { const s = document.createElement('span'); s.textContent = t; s.style.opacity = '.6'; return s; };
+
+        const massIn = numIn(this._payloadKg, 58);
+        massIn.step = '0.1';
+        const cx = numIn(this._payloadCom[0], 40);
+        const cy = numIn(this._payloadCom[1], 40);
+        const cz = numIn(this._payloadCom[2], 40);
+
+        const emitPayload = () => {
+            this._payloadKg = Math.max(0, parseFloat(massIn.value) || 0);
+            massIn.value = String(this._payloadKg);
+            this._payloadCom = [cx, cy, cz].map((i) => parseFloat(i.value) || 0);
+            DynamicsDashboard._savePayload(this._payloadKg, this._payloadCom);
+            this.onPayloadChange?.(this._payloadKg, this.getPayloadComMeters());
+        };
+        [massIn, cx, cy, cz].forEach((i) => i.addEventListener('change', emitPayload));
+
+        const massRow = document.createElement('div');
+        massRow.style.cssText = 'display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:11px;';
+        const massLbl = document.createElement('span'); massLbl.textContent = 'TCP load'; massLbl.style.opacity = '.8';
+        massRow.append(massLbl, massIn, dim('kg'));
+        el.appendChild(massRow);
+
+        const comRow = document.createElement('div');
+        comRow.style.cssText = 'display:flex;align-items:center;gap:4px;margin-bottom:8px;font-size:11px;';
+        const comLbl = document.createElement('span'); comLbl.textContent = 'CoM'; comLbl.style.cssText = 'opacity:.8;margin-right:2px;';
+        comRow.append(comLbl, dim('x'), cx, dim('y'), cy, dim('z'), cz, dim('mm'));
+        el.appendChild(comRow);
 
         const head = document.createElement('div');
         head.style.cssText =

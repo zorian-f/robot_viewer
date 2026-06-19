@@ -137,8 +137,8 @@ export class RobFlowToolsPanel {
 
         // --- Send (needs client) ---
         this._sendBox = el('div', 'margin-top:8px;');
-        this._vel = slider('velocity', 0.01, 1, 0.01, 0.1);
-        this._acc = slider('accel', 0.01, 1, 0.01, 0.1);
+        this._vel = slider('velocity', 0.01, 1, 0.01, 1);
+        this._acc = slider('accel', 0.01, 1, 0.01, 1);
         const apprRow = el('div', 'display:flex;align-items:center;gap:8px;margin:4px 0;');
         apprRow.append(el('span', 'opacity:.8;width:64px;', 'approach'));
         this._appr = el('select', 'flex:1;background:rgba(255,255,255,0.08);color:#e6edf3;border:1px solid rgba(255,255,255,0.15);border-radius:5px;padding:3px;font:inherit;');

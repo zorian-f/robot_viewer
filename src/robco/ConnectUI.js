@@ -5,7 +5,7 @@
  * Token -> GET /status -> SID. A session URL/SID can also be pasted directly (Send then
  * needs the token too). See transport/robcoAuth for why a full in-app OAuth isn't possible.
  */
-import { fetchSession, decodeToken, loginUrl } from '../transport/robcoAuth.js';
+import { fetchSession, decodeToken } from '../transport/robcoAuth.js';
 import { connectLiveSession } from './liveConnect.js';
 
 /** Extract the SID from a full session URL, or pass through a bare SID. */
@@ -28,13 +28,13 @@ export function openConnectDialog(app) {
         'padding:20px;width:560px;max-width:92vw;box-shadow:0 12px 40px rgba(0,0,0,0.5);';
     card.innerHTML = `
         <div style="font-weight:600;font-size:15px;margin-bottom:4px;">Connect to RobFlow</div>
-        <div style="opacity:.65;margin-bottom:14px;line-height:1.5;">
-          Log in at RobCo (Google), then paste your Cognito <b>id token</b>. We exchange it for a
-          session and connect. A session URL alone also works (view-only without a token).
-        </div>
-        <div style="margin-bottom:10px;">
-          <a id="rc-login" href="${loginUrl()}" target="_blank" rel="noopener"
-             style="color:#2f81f7;text-decoration:none;">↗ Open RobCo login (Google)</a>
+        <div style="opacity:.72;margin-bottom:14px;line-height:1.6;">
+          1. <a href="https://robco.studio" target="_blank" rel="noopener"
+                style="color:#2f81f7;text-decoration:none;">Open RobCo Studio ↗</a> and log in (Google).<br>
+          2. DevTools (F12) → <b>Network</b> → click any request to <code>api.robco.studio</code>
+             → copy the <code>authorization: Bearer …</code> value.<br>
+          3. Paste it below → Connect. Token lasts ~1&nbsp;h. (A session URL alone gives a
+             view-only connection.)
         </div>
         <label style="display:block;opacity:.8;margin:8px 0 3px;">Cognito id token (Bearer)</label>
         <textarea id="rc-token" rows="4" placeholder="eyJ…"

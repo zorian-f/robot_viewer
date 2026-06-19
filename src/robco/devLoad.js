@@ -41,13 +41,18 @@ export async function maybeLoadRobCo(app) {
     if (mode === 'session') {
         const sid = params.get('sid');
         if (!sid) return console.error('[RobCo] ?robco=session requires &sid=<SID>');
-        return connectLiveSession(app, { sid, modulesBase: params.get('base') || undefined });
+        return connectLiveSession(app, {
+            sid,
+            token: params.get('token') || undefined,
+            modulesBase: params.get('base') || undefined,
+        });
     }
     if (mode === 'local') {
         return connectLiveSession(app, {
             host: params.get('host') || 'localhost',
             port: Number(params.get('port') || 8000),
             secure: params.get('secure') === '1',
+            token: params.get('token') || undefined,
         });
     }
 

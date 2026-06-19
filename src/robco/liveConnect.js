@@ -6,6 +6,7 @@
  */
 import { resolveSession } from '../transport/session.js';
 import { RobFlowSocket } from '../transport/RobFlowSocket.js';
+import { RobFlowClient } from '../transport/RobFlowClient.js';
 import { RobCoModuleAdapter } from '../adapters/RobCoModuleAdapter.js';
 import { applyAnglesDeg, applyBaseShift } from './poseUtils.js';
 import { DynamicsController } from '../dynamics/DynamicsController.js';
@@ -22,6 +23,7 @@ export async function connectLiveSession(app, opts) {
     const session = resolveSession(opts);
     console.log(`[RobCo] live ${session.mode} connect: ${redactSid(session.wsUrl)}`);
 
+    const client = new RobFlowClient(session.restBase, { token: opts.token });
     const socket = new RobFlowSocket(session.wsUrl);
     let model = null;
     let building = false;
@@ -60,7 +62,7 @@ export async function connectLiveSession(app, opts) {
 
             // Teach pendant (drag gizmo -> IK preview). Pauses the mirror while teaching.
             try {
-                teach = await TeachPendant.attach(app, model);
+                teach = await TeachPendant.attach(app, model, { client });
             } catch (e) {
                 console.error('[RobCo] teach pendant failed:', e);
             }

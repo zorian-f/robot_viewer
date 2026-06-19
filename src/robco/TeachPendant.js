@@ -35,13 +35,14 @@ export class TeachPendant {
         const jointOrder = model.userData?.jointOrder || [];
         if (jointOrder.length === 0) return null;
         const kin = await MujocoKinematics.create(descriptors, opts);
-        return new TeachPendant(app, model, kin);
+        return new TeachPendant(app, model, kin, opts.client || null);
     }
 
-    constructor(app, model, kin) {
+    constructor(app, model, kin, client = null) {
         this.app = app;
         this.model = model;
         this.kin = kin;
+        this.client = client; // RobFlowClient for sending; null in static (no-session) mode
         this.sm = app.sceneManager;
         this.jointNames = model.userData.jointOrder;
         this.enabled = false;
@@ -151,11 +152,41 @@ export class TeachPendant {
         this.btn.textContent = `Teach Pendant: ${on ? 'ON' : 'OFF'}`;
         this.btn.style.background = on ? '#238636' : 'rgba(13,17,23,0.88)';
         this._modeBtn.style.display = on ? 'inline-block' : 'none';
+        const showSend = on && !!this.client;
+        this._sendBtn.style.display = showSend ? 'inline-block' : 'none';
+        this._stopBtn.style.display = showSend ? 'inline-block' : 'none';
         this._readout.style.display = on ? 'block' : 'none';
     }
 
     toggle() {
         this.setEnabled(!this.enabled);
+    }
+
+    /** Send the previewed joint pose to the robot (gated, with confirm). */
+    async _send() {
+        if (!this.client) return;
+        const deg = this._currentQ().map((r) => (r * 180) / Math.PI);
+        const pretty = deg.map((d) => d.toFixed(1)).join(', ');
+        if (!window.confirm(`Send joint move to the robot?\n\n[${pretty}] °\n\nThe real robot will move. Ensure it is in TEACH mode and the area is clear.`)) {
+            return;
+        }
+        this._readout.textContent = 'sending move…';
+        try {
+            await this.client.moveJointAngles(deg, { velocity: 0.1, acceleration: 0.1 });
+            this._readout.textContent = 'move command sent ✓';
+        } catch (e) {
+            this._readout.textContent = `send failed: ${e.message}`;
+            console.error('[RobCo] send failed:', e);
+        }
+    }
+
+    async _stop() {
+        try {
+            await this.client?.stop();
+            this._readout.textContent = 'STOP sent';
+        } catch (e) {
+            this._readout.textContent = `stop failed: ${e.message}`;
+        }
     }
 
     _buildUI() {
@@ -178,16 +209,29 @@ export class TeachPendant {
             this._setMode(this.mode === 'translate' ? 'rotate' : 'translate'),
         );
 
+        const sendBtn = document.createElement('button');
+        sendBtn.textContent = 'Send to Robot';
+        sendBtn.style.cssText = btnCss + 'display:none;margin-left:6px;border-color:#2f81f7;';
+        sendBtn.addEventListener('click', () => this._send());
+
+        const stopBtn = document.createElement('button');
+        stopBtn.textContent = 'Stop';
+        stopBtn.style.cssText =
+            btnCss + 'display:none;margin-left:6px;background:#5a1e1e;border-color:#f85149;';
+        stopBtn.addEventListener('click', () => this._stop());
+
         const readout = document.createElement('div');
         readout.style.cssText =
             'margin-top:6px;font:11px ui-monospace,monospace;color:#9da7b3;display:none;';
 
         const row = document.createElement('div');
-        row.append(btn, modeBtn);
+        row.append(btn, modeBtn, sendBtn, stopBtn);
         wrap.append(row, readout);
         document.body.appendChild(wrap);
         this.btn = btn;
         this._modeBtn = modeBtn;
+        this._sendBtn = sendBtn;
+        this._stopBtn = stopBtn;
         this._readout = readout;
         this._buttonWrap = wrap;
     }

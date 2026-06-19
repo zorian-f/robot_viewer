@@ -9,6 +9,7 @@
  */
 import { OPERATION_MODE, ROBOT_STATE, SAFETY_STATE, label, SEVERITY_COLOR, canTeach } from './robcoEnums.js';
 import { buildJointFlow } from '../transport/flowBuilder.js';
+import { makeDraggable } from './draggable.js';
 
 const PANEL_CSS =
     'position:fixed;right:16px;top:16px;z-index:3000;width:300px;font:12px/1.45 ui-monospace,Menlo,Consolas,monospace;' +
@@ -105,7 +106,8 @@ export class RobFlowToolsPanel {
 
     _build() {
         const root = el('div', PANEL_CSS);
-        root.append(el('div', 'font-weight:600;font-size:14px;color:#fff;margin-bottom:2px;', 'RobFlow Tools'));
+        const title = el('div', 'font-weight:600;font-size:14px;color:#fff;margin-bottom:2px;', 'RobFlow Tools  ⠿');
+        root.append(title);
 
         // --- Status ---
         root.append(sectionTitle('Status'));
@@ -212,6 +214,7 @@ export class RobFlowToolsPanel {
 
         document.body.appendChild(root);
         this.root = root;
+        makeDraggable(root, title);
         this._teachVisible(false);
     }
 

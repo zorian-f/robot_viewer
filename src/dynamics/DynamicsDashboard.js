@@ -4,6 +4,8 @@
  * Pure DOM (no framework), styled to sit over the three.js canvas. Built once for a given
  * joint count; `render()` just updates values + the utilization bars.
  */
+import { makeDraggable } from '../robco/draggable.js';
+
 const RAD2DEG = 180 / Math.PI;
 
 function utilColor(u) {
@@ -59,9 +61,10 @@ export class DynamicsDashboard {
             box-shadow: 0 6px 24px rgba(0,0,0,0.4);`;
 
         const title = document.createElement('div');
-        title.textContent = 'Joint Dynamics';
+        title.textContent = 'Joint Dynamics  ⠿';
         title.style.cssText = 'font-weight:600;margin-bottom:8px;letter-spacing:.04em;color:#fff;';
         el.appendChild(title);
+        this._title = title;
 
         const head = document.createElement('div');
         head.style.cssText =
@@ -118,6 +121,7 @@ export class DynamicsDashboard {
 
         parent.appendChild(el);
         this.el = el;
+        makeDraggable(el, this._title);
     }
 
     _buildSettings(container) {

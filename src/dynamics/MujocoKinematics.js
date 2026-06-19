@@ -11,6 +11,7 @@
  * All radians / metres. Validated headless in scripts/ik_validate.mjs.
  */
 import { mjcfFromModules } from './mjcfFromModules.js';
+import { ROBCO_AXIS_LIMIT_RAD } from '../robco/robcoLimits.js';
 
 const DRIVE_TYPES = new Set(['Drive', 'BaseDrive']);
 
@@ -24,8 +25,9 @@ export class MujocoKinematics {
     constructor(mj, descriptors, opts = {}) {
         this.mj = mj;
         const drives = descriptors.filter((d) => DRIVE_TYPES.has(d['module-type']));
-        this.qLower = drives.map((d) => d.module_properties?.q_lower_hard ?? -Math.PI);
-        this.qUpper = drives.map((d) => d.module_properties?.q_upper_hard ?? Math.PI);
+        // RobCo axes all travel ±270° (see robcoLimits.js); clamp IK to the same on every axis.
+        this.qLower = drives.map(() => -ROBCO_AXIS_LIMIT_RAD);
+        this.qUpper = drives.map(() => ROBCO_AXIS_LIMIT_RAD);
         try { mj.FS.mkdir('/working'); } catch { /* exists */ }
         try { mj.FS.mount(mj.MEMFS, { root: '.' }, '/working'); } catch { /* mounted */ }
 

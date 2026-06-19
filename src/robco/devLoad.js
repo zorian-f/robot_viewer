@@ -13,6 +13,7 @@
 import { RobCoModuleAdapter } from '../adapters/RobCoModuleAdapter.js';
 import { connectLiveSession } from './liveConnect.js';
 import { applyAnglesDeg } from './poseUtils.js';
+import { loadSession, loadToken } from './sessionStore.js';
 
 // RobCo's public geometry CDN (Access-Control-Allow-Origin: *), no session/auth needed.
 const PUBLIC_MODULES_CDN = 'https://robco.studio/modules';
@@ -67,7 +68,20 @@ export async function maybeLoadRobCo(app) {
     const params = new URLSearchParams(location.search);
     if (params.get('chrome') !== '1') removeOriginalChrome();
     addConnectButton(app);
-    if (!params.has('robco')) return;
+    if (!params.has('robco')) {
+        // No explicit mode: restore the last connected session across reloads, if any.
+        const saved = loadSession();
+        if (saved?.sid) {
+            const token = loadToken() || undefined;
+            console.log(`[RobCo] restoring saved session ${token ? '(with token)' : '(view-only)'}`);
+            try {
+                await connectLiveSession(app, { sid: saved.sid, token });
+            } catch (e) {
+                console.warn('[RobCo] saved-session reconnect failed:', e);
+            }
+        }
+        return;
+    }
     const mode = params.get('robco');
 
     if (mode === 'connect') {

@@ -24,6 +24,7 @@ import {
 } from '../models/UnifiedRobotModel.js';
 import { RobotModuleNode } from '../robco/ModuleGeometry.js';
 import { chainOrder } from '../robco/chainOrder.js';
+import { ROBCO_AXIS_LIMIT_RAD } from '../robco/robcoLimits.js';
 
 const MODULE_MAPPING_FILE = 'module_folder_mapping.json';
 
@@ -150,8 +151,10 @@ export class RobCoModuleAdapter {
                 joint.currentValue = 0;
 
                 const limits = new JointLimits();
-                if (mp.q_lower_hard !== undefined) limits.lower = mp.q_lower_hard;
-                if (mp.q_upper_hard !== undefined) limits.upper = mp.q_upper_hard;
+                // Every RobCo axis travels ±270° — apply uniformly (see robcoLimits.js),
+                // not the descriptor's q_*_hard (often absent -> would default to ±180°).
+                limits.lower = -ROBCO_AXIS_LIMIT_RAD;
+                limits.upper = ROBCO_AXIS_LIMIT_RAD;
                 if (mp.peak_torque !== undefined) limits.effort = mp.peak_torque;
                 if (mp.max_velocity !== undefined) limits.velocity = mp.max_velocity;
                 joint.limits = limits;

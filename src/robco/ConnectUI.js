@@ -7,6 +7,7 @@
  */
 import { fetchSession, decodeToken } from '../transport/robcoAuth.js';
 import { connectLiveSession } from './liveConnect.js';
+import { saveSession, loadSession, saveToken, loadToken, clearSession } from './sessionStore.js';
 
 /** Extract the SID from a full session URL, or pass through a bare SID. */
 function parseSid(input) {
@@ -46,6 +47,8 @@ export function openConnectDialog(app) {
           border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:8px;font:inherit;"/>
         <div id="rc-status" style="min-height:18px;margin-top:10px;font-size:12px;opacity:.85;"></div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px;">
+          <button id="rc-forget" style="margin-right:auto;background:transparent;color:#9da7b3;border:1px solid rgba(255,255,255,0.15);
+            border-radius:8px;padding:8px 14px;cursor:pointer;font:inherit;">Forget saved</button>
           <button id="rc-cancel" style="background:transparent;color:#9da7b3;border:1px solid rgba(255,255,255,0.15);
             border-radius:8px;padding:8px 14px;cursor:pointer;font:inherit;">Cancel</button>
           <button id="rc-connect" style="background:#238636;color:#fff;border:0;border-radius:8px;
@@ -61,25 +64,42 @@ export function openConnectDialog(app) {
     };
     const close = () => overlay.remove();
 
-    $('#rc-token').addEventListener('input', () => {
+    const showTokenStatus = () => {
         const t = $('#rc-token').value.trim();
         if (!t) return status('');
         const info = decodeToken(t);
         if (!info) status('token does not look like a JWT');
         else if (info.expired) status(`token expired (${info.email || ''})`);
         else status(`token ok — ${info.email || ''}, ~${info.expiresInMin} min left`, true);
-    });
+    };
+    $('#rc-token').addEventListener('input', showTokenStatus);
 
+    // Pre-fill from a remembered session (URL persists; token survives reload until tab close).
+    const saved = loadSession();
+    if (saved?.url) $('#rc-sid').value = saved.url;
+    const savedToken = loadToken();
+    if (savedToken) { $('#rc-token').value = savedToken; showTokenStatus(); }
+
+    $('#rc-forget').addEventListener('click', () => {
+        clearSession();
+        $('#rc-sid').value = '';
+        $('#rc-token').value = '';
+        status('cleared saved session', true);
+    });
     $('#rc-cancel').addEventListener('click', close);
     overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
 
     $('#rc-connect').addEventListener('click', async () => {
         const token = $('#rc-token').value.trim();
-        let sid = parseSid($('#rc-sid').value);
+        const rawSid = $('#rc-sid').value.trim();
+        let sid = parseSid(rawSid);
         status('connecting…');
         try {
             if (token && !sid) sid = await fetchSession(token);
             if (!sid) throw new Error('paste a token or a session URL/SID');
+            // Remember for next reload (browser storage only).
+            saveSession(rawSid || sid, sid);
+            saveToken(token);
             close();
             await connectLiveSession(app, { sid, token: token || undefined });
             console.log('[RobCo] connected via dialog');

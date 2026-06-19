@@ -11,6 +11,7 @@ import { RobCoModuleAdapter } from '../adapters/RobCoModuleAdapter.js';
 import { applyAnglesDeg, applyBaseShift } from './poseUtils.js';
 import { DynamicsController } from '../dynamics/DynamicsController.js';
 import { TeachPendant } from './TeachPendant.js';
+import { RobFlowToolsPanel } from './RobFlowToolsPanel.js';
 
 const redactSid = (url) => url.replace(/session\/ws\/[^/]+/, 'session/ws/<SID>');
 
@@ -24,6 +25,7 @@ export async function connectLiveSession(app, opts) {
     console.log(`[RobCo] live ${session.mode} connect: ${redactSid(session.wsUrl)}`);
 
     const client = new RobFlowClient(session.restBase, { token: opts.token });
+    const panel = new RobFlowToolsPanel(app, { client });
     const socket = new RobFlowSocket(session.wsUrl);
     let model = null;
     let building = false;
@@ -62,7 +64,8 @@ export async function connectLiveSession(app, opts) {
 
             // Teach pendant (drag gizmo -> IK preview). Pauses the mirror while teaching.
             try {
-                teach = await TeachPendant.attach(app, model, { client });
+                teach = await TeachPendant.attach(app, model);
+                panel.setTeach(teach);
             } catch (e) {
                 console.error('[RobCo] teach pendant failed:', e);
             }
@@ -93,9 +96,10 @@ export async function connectLiveSession(app, opts) {
         else pendingPayload = { mass: p.mass || 0, com };
     });
 
-    socket.onStatus((state) => {
-        if (state !== 'open') console.log(`[RobCo] ws ${state}`);
-    });
+    socket.on('robotState', (d) => panel.setStates({ robotState: d }));
+    socket.on('operationMode', (d) => panel.setStates({ operationMode: d }));
+    socket.on('safetyState', (d) => panel.setStates({ safetyState: d }));
+    socket.onStatus((state) => panel.setWs(state === 'open'));
 
     socket.connect();
     app._robflowSocket = socket; // keep a handle for teardown/debugging

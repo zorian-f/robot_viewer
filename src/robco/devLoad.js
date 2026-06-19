@@ -114,13 +114,15 @@ export async function maybeLoadRobCo(app) {
             console.error('[RobCo] dynamics dashboard failed:', e);
         }
 
-        // Teach pendant (drag the TCP gizmo -> IK preview). Off until the button is clicked.
+        // Teach tools panel (gizmo + IK preview). No client in static mode → preview only.
         try {
             const { TeachPendant } = await import('./TeachPendant.js');
+            const { RobFlowToolsPanel } = await import('./RobFlowToolsPanel.js');
             const teach = await TeachPendant.attach(app, model);
-            if (teach) window._robcoTeach = teach;
+            window._robcoTeach = teach;
+            window._robcoPanel = new RobFlowToolsPanel(app, { teach, client: null });
         } catch (e) {
-            console.error('[RobCo] teach pendant failed:', e);
+            console.error('[RobCo] teach tools failed:', e);
         }
     } catch (err) {
         console.error('[RobCo] load failed:', err);

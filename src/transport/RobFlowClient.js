@@ -44,6 +44,35 @@ export class RobFlowClient {
         return res.status;
     }
 
+    async _get(path) {
+        const res = await fetch(`${this.restBase}${path}`, {
+            headers: this._headers(),
+            credentials: 'omit',
+        });
+        if (!res.ok) throw new Error(`GET ${path} → HTTP ${res.status}`);
+        return res.json();
+    }
+
+    /** GET /robot-config/ — also used as a lightweight API-reachability ping. */
+    getRobotConfig() {
+        return this._get('/robot-config/');
+    }
+
+    /** Set global speed fraction (0..1). */
+    setGlobalSpeed(speed) {
+        return this._put('/global-speed', Math.round(speed * 1000) / 1000);
+    }
+
+    /** Stop any active jog motion. */
+    stopJogging() {
+        return this._put('/stop-jogging');
+    }
+
+    /** Jog a single joint at a velocity fraction (requires JOGGING/TEACH mode). */
+    jogJoint(jointIndex, velocity) {
+        return this._put('/jog-joint', { jointIndex, velocity });
+    }
+
     /** Move to joint angles (degrees). approachMode: 1=PTP, 2=Linear. */
     moveJointAngles(anglesDeg, { velocity = 0.1, acceleration = 0.1, approachMode = 1 } = {}) {
         return this._put('/move-joint-angles', [

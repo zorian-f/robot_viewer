@@ -59,6 +59,47 @@ export class RobFlowToolsPanel {
         if (teach) {
             teach.onIk = (res) => this._setIk(res);
             teach.onModeChange = (m) => this._setMode(m);
+            if (this.client) this._buildJogRows(teach.jointNames);
+        }
+    }
+
+    _buildJogRows(jointNames) {
+        this._jogRows.innerHTML = '';
+        jointNames.forEach((_, i) => {
+            const row = el('div', 'display:flex;gap:6px;align-items:center;margin:3px 0;');
+            row.append(el('span', 'width:30px;opacity:.8;', `J${i + 1}`));
+            const minus = el('button', BTN + 'flex:1;', '−');
+            const plus = el('button', BTN + 'flex:1;', '+');
+            minus.addEventListener('pointerdown', (e) => { e.preventDefault(); this._jogStart(i, -1); });
+            plus.addEventListener('pointerdown', (e) => { e.preventDefault(); this._jogStart(i, 1); });
+            for (const b of [minus, plus]) {
+                b.addEventListener('pointerup', () => this._jogStop());
+                b.addEventListener('pointerleave', () => this._jogStop());
+                b.addEventListener('pointercancel', () => this._jogStop());
+            }
+            row.append(minus, plus);
+            this._jogRows.append(row);
+        });
+    }
+
+    _jogStart(index, dir) {
+        if (!this.client) return;
+        this._jogStop();
+        const v = dir * this._jogSpeed.get();
+        const fire = () => this.client.jogJoint(index, v).then(() => this.setApi(true)).catch((e) => {
+            this.setApi(false);
+            this._ik.textContent = `jog failed: ${e.message}`;
+            this._jogStop();
+        });
+        fire();
+        this._jogTimer = setInterval(fire, 800); // re-send before the ~1 s jog timeout
+    }
+
+    _jogStop() {
+        if (this._jogTimer) {
+            clearInterval(this._jogTimer);
+            this._jogTimer = null;
+            this.client?.stopJogging?.().catch(() => {});
         }
     }
 
@@ -152,11 +193,21 @@ export class RobFlowToolsPanel {
         pushBtn.addEventListener('click', () => this._pushFlow(false));
         runBtn.addEventListener('click', () => this._pushFlow(true));
 
+        // --- Jog (needs client; press-and-hold per joint, requires JOGGING/TEACH mode) ---
+        this._jogBox = el('div');
+        this._jogBox.append(sectionTitle('Jog (hold)'));
+        this._jogSpeed = slider('speed', 0.01, 1, 0.01, 0.1);
+        this._jogBox.append(this._jogSpeed.row);
+        this._jogRows = el('div');
+        this._jogBox.append(this._jogRows);
+        root.append(this._jogBox);
+
         // Hide robot-only sections without a client.
         if (!this.client) {
             this._sendBox.style.display = 'none';
             this._ctrlBox.style.display = 'none';
             this._wpBox.style.display = 'none';
+            this._jogBox.style.display = 'none';
         }
 
         document.body.appendChild(root);
@@ -295,6 +346,7 @@ export class RobFlowToolsPanel {
     }
 
     dispose() {
+        this._jogStop();
         this.root?.remove();
     }
 }

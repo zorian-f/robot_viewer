@@ -30,6 +30,12 @@ export class DynamicsController {
         // Live-tune the derivative estimator from the panel's settings (fixed Δt on/off + ms).
         ctrl.deriv.setOptions(dash.getSettings());
         dash.onSettingsChange = (s) => ctrl.deriv.setOptions(s);
+
+        // TCP payload (kg) -> rebuild the dynamics model with a load at the flange.
+        dash.onPayloadChange = (kg) => ctrl.setPayload(kg);
+        const payload0 = dash.getPayload?.() || 0;
+        if (payload0 > 0) ctrl.dyn.setPayload(payload0); // apply persisted load before first compute
+
         return ctrl;
     }
 
@@ -44,6 +50,7 @@ export class DynamicsController {
      * @param {number} [tMs] - sample timestamp.
      */
     update(anglesDeg, tMs) {
+        this._lastAngles = anglesDeg;
         const qRad = anglesDeg.map((d) => d * DEG2RAD);
         const { velocity, acceleration } = this.deriv.update(qRad, tMs);
         const { torque, utilization } = this.dyn.computeTorques(qRad, velocity, acceleration);
@@ -52,7 +59,9 @@ export class DynamicsController {
 
     /** @param {number} mass kg @param {number[]} com flange-frame CoM (m) */
     setPayload(mass, com = [0, 0, 0]) {
-        this.dyn.setPayload(mass, com);
+        this.dyn.setPayload(mass, com); // rebuilds the MuJoCo model with the load at the flange
+        // Recompute immediately so the change shows even when idle (static pose).
+        if (this._lastAngles) this.update(this._lastAngles, performance.now());
     }
 
     dispose() {

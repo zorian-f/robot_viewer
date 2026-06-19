@@ -25,8 +25,28 @@ export class DynamicsDashboard {
         this.rows = [];
         /** @type {?(s:{fixedDt:boolean,fixedDtMs:number})=>void} */
         this.onSettingsChange = null;
+        /** @type {?(kg:number)=>void} */
+        this.onPayloadChange = null;
         this.settings = DynamicsDashboard._loadSettings();
+        this._payloadKg = DynamicsDashboard._loadPayload();
         this._build(parent);
+    }
+
+    getPayload() {
+        return this._payloadKg;
+    }
+
+    static _loadPayload() {
+        try {
+            const v = parseFloat(localStorage.getItem('robco-tcp-payload'));
+            return Number.isFinite(v) ? Math.max(0, v) : 0;
+        } catch {
+            return 0;
+        }
+    }
+
+    static _savePayload(v) {
+        try { localStorage.setItem('robco-tcp-payload', String(v)); } catch { /* ignore */ }
     }
 
     getSettings() {
@@ -65,6 +85,33 @@ export class DynamicsDashboard {
         title.style.cssText = 'font-weight:600;margin-bottom:8px;letter-spacing:.04em;color:#fff;';
         el.appendChild(title);
         this._title = title;
+
+        // TCP payload (kg) — included in the inverse-dynamics torque / utilization.
+        const payRow = document.createElement('div');
+        payRow.style.cssText = 'display:flex;align-items:center;gap:6px;margin-bottom:8px;font-size:11px;';
+        const payLbl = document.createElement('span');
+        payLbl.textContent = 'TCP load';
+        payLbl.style.opacity = '.8';
+        const payIn = document.createElement('input');
+        payIn.type = 'number';
+        payIn.min = '0';
+        payIn.step = '0.1';
+        payIn.value = String(this._payloadKg);
+        payIn.style.cssText =
+            'width:64px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);' +
+            'border-radius:4px;color:#e6edf3;padding:2px 5px;font:inherit;text-align:right;';
+        const payUnit = document.createElement('span');
+        payUnit.textContent = 'kg';
+        payUnit.style.opacity = '.7';
+        const applyPay = () => {
+            this._payloadKg = Math.max(0, parseFloat(payIn.value) || 0);
+            payIn.value = String(this._payloadKg);
+            DynamicsDashboard._savePayload(this._payloadKg);
+            this.onPayloadChange?.(this._payloadKg);
+        };
+        payIn.addEventListener('change', applyPay);
+        payRow.append(payLbl, payIn, payUnit);
+        el.appendChild(payRow);
 
         const head = document.createElement('div');
         head.style.cssText =

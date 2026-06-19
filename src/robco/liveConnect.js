@@ -8,6 +8,7 @@ import { resolveSession } from '../transport/session.js';
 import { RobFlowSocket } from '../transport/RobFlowSocket.js';
 import { RobCoModuleAdapter } from '../adapters/RobCoModuleAdapter.js';
 import { applyAnglesDeg, applyBaseShift } from './poseUtils.js';
+import { DynamicsController } from '../dynamics/DynamicsController.js';
 
 const redactSid = (url) => url.replace(/session\/ws\/[^/]+/, 'session/ws/<SID>');
 
@@ -25,6 +26,8 @@ export async function connectLiveSession(app, opts) {
     let building = false;
     let latestAngles = null;
     let latestBaseShift = null;
+    let dynamics = null;
+    let pendingPayload = null;
 
     socket.on('robotModuleIds', async (ids) => {
         if (model || building) return; // build once; rebuild-on-change can come later
@@ -41,6 +44,17 @@ export async function connectLiveSession(app, opts) {
             console.log(
                 `[RobCo] live robot ready: ${model.links.size} links, ${model.joints.size} joints`,
             );
+
+            // Live dynamics dashboard (torque/utilization each frame).
+            try {
+                dynamics = await DynamicsController.attach(model);
+                if (dynamics && pendingPayload) {
+                    dynamics.setPayload(pendingPayload.mass, pendingPayload.com);
+                }
+                if (dynamics && latestAngles) dynamics.update(latestAngles, performance.now());
+            } catch (e) {
+                console.error('[RobCo] dynamics dashboard failed:', e);
+            }
         } catch (err) {
             console.error('[RobCo] live build failed:', err);
             building = false;
@@ -50,11 +64,20 @@ export async function connectLiveSession(app, opts) {
     socket.on('jointAngles', (angles) => {
         latestAngles = angles;
         if (model) applyAnglesDeg(model, angles);
+        if (dynamics) dynamics.update(angles, performance.now());
     });
 
     socket.on('baseShift', (bs) => {
         latestBaseShift = bs;
         if (model) applyBaseShift(model, bs);
+    });
+
+    socket.on('payload', (p) => {
+        if (!p) return;
+        // RobFlow payload: mass (kg) + centerOfMass. CoM assumed metres in the flange frame.
+        const com = p.centerOfMass || [0, 0, 0];
+        if (dynamics) dynamics.setPayload(p.mass || 0, com);
+        else pendingPayload = { mass: p.mass || 0, com };
     });
 
     socket.onStatus((state) => {

@@ -73,6 +73,19 @@ export async function maybeLoadRobCo(app) {
             `[RobCo] loaded: ${model.links.size} links, ${model.joints.size} joints`,
             model.userData.jointOrder,
         );
+
+        // Dynamics dashboard (static pose -> static gravity torques).
+        try {
+            const { DynamicsController } = await import('../dynamics/DynamicsController.js');
+            const ctrl = await DynamicsController.attach(model);
+            if (ctrl) {
+                const a = anglesDeg || (model.userData.jointOrder || []).map(() => 0);
+                ctrl.update(a, performance.now());
+                window._robcoDynamics = ctrl;
+            }
+        } catch (e) {
+            console.error('[RobCo] dynamics dashboard failed:', e);
+        }
     } catch (err) {
         console.error('[RobCo] load failed:', err);
     }

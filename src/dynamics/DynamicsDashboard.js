@@ -21,7 +21,30 @@ export class DynamicsDashboard {
     constructor(jointLabels, parent = document.body) {
         this.jointLabels = jointLabels;
         this.rows = [];
+        /** @type {?(s:{fixedDt:boolean,fixedDtMs:number})=>void} */
+        this.onSettingsChange = null;
+        this.settings = DynamicsDashboard._loadSettings();
         this._build(parent);
+    }
+
+    getSettings() {
+        return { ...this.settings };
+    }
+
+    static _loadSettings() {
+        try {
+            const s = JSON.parse(localStorage.getItem('robco-dyn-settings'));
+            if (s && typeof s.fixedDt === 'boolean') {
+                return { fixedDt: s.fixedDt, fixedDtMs: s.fixedDtMs > 0 ? s.fixedDtMs : 62.5 };
+            }
+        } catch { /* ignore */ }
+        return { fixedDt: true, fixedDtMs: 62.5 };
+    }
+
+    static _saveSettings(s) {
+        try {
+            localStorage.setItem('robco-dyn-settings', JSON.stringify(s));
+        } catch { /* ignore */ }
     }
 
     _build(parent) {
@@ -91,8 +114,64 @@ export class DynamicsDashboard {
             this.rows.push(cells);
         });
 
+        this._buildSettings(el);
+
         parent.appendChild(el);
         this.el = el;
+    }
+
+    _buildSettings(container) {
+        const wrap = document.createElement('div');
+        wrap.style.cssText =
+            'margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.1);' +
+            'display:flex;align-items:center;gap:8px;font-size:11px;';
+
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = this.settings.fixedDt;
+        cb.style.cssText = 'accent-color:#3fb950;cursor:pointer;margin:0;';
+        const lbl = document.createElement('label');
+        lbl.textContent = 'Fixed Δt';
+        lbl.style.cursor = 'pointer';
+        lbl.prepend(cb);
+        lbl.style.cssText = 'display:flex;align-items:center;gap:5px;cursor:pointer;';
+
+        const num = document.createElement('input');
+        num.type = 'number';
+        num.min = '1';
+        num.step = '0.5';
+        num.value = String(this.settings.fixedDtMs);
+        num.style.cssText =
+            'width:52px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);' +
+            'border-radius:4px;color:#e6edf3;padding:2px 4px;font:inherit;text-align:right;';
+        const unit = document.createElement('span');
+        unit.textContent = 'ms';
+        unit.style.opacity = '.7';
+        const hz = document.createElement('span');
+        hz.style.cssText = 'opacity:.55;margin-left:auto;';
+
+        const updHz = () => {
+            const ms = parseFloat(num.value) || 0;
+            hz.textContent = ms > 0 ? `${(1000 / ms).toFixed(1)} Hz` : '';
+        };
+        const emit = () => {
+            this.settings = { fixedDt: cb.checked, fixedDtMs: parseFloat(num.value) || 62.5 };
+            num.disabled = !cb.checked;
+            num.style.opacity = cb.checked ? '1' : '.4';
+            DynamicsDashboard._saveSettings(this.settings);
+            updHz();
+            this.onSettingsChange?.(this.settings);
+        };
+
+        cb.addEventListener('change', emit);
+        num.addEventListener('change', emit);
+        num.addEventListener('input', updHz);
+        num.disabled = !cb.checked;
+        num.style.opacity = cb.checked ? '1' : '.4';
+        updHz();
+
+        wrap.append(lbl, num, unit, hz);
+        container.appendChild(wrap);
     }
 
     /**

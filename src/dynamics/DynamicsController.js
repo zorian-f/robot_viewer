@@ -25,7 +25,12 @@ export class DynamicsController {
 
         const dyn = await MujocoDynamics.create(descriptors, opts);
         const dash = new DynamicsDashboard(jointOrder, opts.parent);
-        return new DynamicsController(dyn, dash);
+        const ctrl = new DynamicsController(dyn, dash);
+
+        // Live-tune the derivative estimator from the panel's settings (fixed Δt on/off + ms).
+        ctrl.deriv.setOptions(dash.getSettings());
+        dash.onSettingsChange = (s) => ctrl.deriv.setOptions(s);
+        return ctrl;
     }
 
     constructor(dyn, dash) {

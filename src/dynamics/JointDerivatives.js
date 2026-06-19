@@ -13,18 +13,33 @@ export class JointDerivatives {
     /**
      * @param {Object} [opts]
      * @param {number} [opts.windowSize=7] - samples used for each fit (>=3 enables accel).
-     * @param {number} [opts.minDtMs=1] - ignore samples closer than this in time.
+     * @param {number} [opts.minDtMs=1] - ignore samples closer than this in time (raw mode).
+     * @param {boolean} [opts.fixedDt=true] - assume a fixed sample interval instead of using
+     *   wall-clock arrival time. The stream carries no timestamp and is jittery/batched, so a
+     *   fixed Δt removes network/event-loop jitter from the derivatives.
+     * @param {number} [opts.fixedDtMs=62.5] - the assumed interval (62.5 ms = 16 Hz).
      */
-    constructor({ windowSize = 7, minDtMs = 1 } = {}) {
+    constructor({ windowSize = 7, minDtMs = 1, fixedDt = true, fixedDtMs = 62.5 } = {}) {
         this.windowSize = Math.max(3, windowSize);
         this.minDtMs = minDtMs;
+        this.fixedDt = fixedDt;
+        this.fixedDtMs = fixedDtMs;
         this.reset();
+    }
+
+    /** Update options live (e.g. from the settings UI). */
+    setOptions(opts = {}) {
+        if (opts.windowSize !== undefined) this.windowSize = Math.max(3, opts.windowSize);
+        if (opts.minDtMs !== undefined) this.minDtMs = opts.minDtMs;
+        if (opts.fixedDt !== undefined) this.fixedDt = !!opts.fixedDt;
+        if (opts.fixedDtMs !== undefined && opts.fixedDtMs > 0) this.fixedDtMs = opts.fixedDtMs;
     }
 
     reset() {
         this._t = []; // ms timestamps
         this._q = []; // number[][] positions per sample
         this._n = 0; // joint count
+        this._clock = 0; // synthetic clock for fixed-Δt mode
     }
 
     /**
@@ -39,14 +54,21 @@ export class JointDerivatives {
             this.reset();
             this._n = positions.length;
         }
-        const last = this._t[this._t.length - 1];
-        if (last !== undefined && tMs - last < this.minDtMs) {
-            // too close in time; just refresh the latest sample
-            this._q[this._q.length - 1] = positions.slice();
-            this._t[this._t.length - 1] = tMs;
-        } else {
-            this._t.push(tMs);
+        if (this.fixedDt) {
+            // Ignore jittery arrival time; advance a synthetic clock by a fixed interval.
+            this._clock += this.fixedDtMs;
+            this._t.push(this._clock);
             this._q.push(positions.slice());
+        } else {
+            const last = this._t[this._t.length - 1];
+            if (last !== undefined && tMs - last < this.minDtMs) {
+                // too close in time (batched); just refresh the latest sample
+                this._q[this._q.length - 1] = positions.slice();
+                this._t[this._t.length - 1] = tMs;
+            } else {
+                this._t.push(tMs);
+                this._q.push(positions.slice());
+            }
         }
         while (this._t.length > this.windowSize) {
             this._t.shift();

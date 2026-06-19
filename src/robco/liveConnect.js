@@ -14,6 +14,7 @@ import { applyAnglesDeg, applyBaseShift } from './poseUtils.js';
 import { DynamicsController } from '../dynamics/DynamicsController.js';
 import { TeachPendant } from './TeachPendant.js';
 import { RobFlowToolsPanel } from './RobFlowToolsPanel.js';
+import { saveSession, saveToken } from './sessionStore.js';
 
 const redactSid = (url) => url.replace(/session\/ws\/[^/]+/, 'session/ws/<SID>');
 
@@ -43,6 +44,7 @@ export async function connectLiveSession(app, opts) {
     let dynamics = null;
     let teach = null;
     let pendingPayload = null;
+    let firstJa = true;
 
     socket.on('robotModuleIds', async (ids) => {
         if (model || building) return; // build once; rebuild-on-change can come later
@@ -91,6 +93,7 @@ export async function connectLiveSession(app, opts) {
     });
 
     socket.on('jointAngles', (angles) => {
+        if (firstJa) { firstJa = false; console.log(`[RobCo] first jointAngles received (${angles?.length} joints)`); }
         latestAngles = angles;
         // Pause the mirror while teaching so dragging isn't fought by incoming angles.
         if (model && !app._teachActive) applyAnglesDeg(model, angles);
@@ -123,6 +126,16 @@ export async function connectLiveSession(app, opts) {
         panel.setWs(state === 'open');
         // Don't average a connection gap into the rate; resume cleanly on (re)connect.
         meter.breakGap();
+        if (state === 'open') {
+            console.log(`[RobCo] WS open: ${redactSid(session.wsUrl)}`);
+            // Persist any working cloud session so a reload auto-reconnects to THIS sid.
+            if (opts.sid) {
+                saveSession(opts.sid, opts.sid);
+                saveToken(opts.token);
+            }
+        } else {
+            console.log(`[RobCo] WS ${state}`);
+        }
     });
 
     socket.connect();

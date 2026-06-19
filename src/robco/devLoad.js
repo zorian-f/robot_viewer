@@ -64,22 +64,51 @@ function addConnectButton(app) {
     window._robcoConnectBtn = btn;
 }
 
+// Auto-reconnect the last working session on a plain reload (no ?robco= mode).
+// A still-valid saved token lets us re-derive the CURRENT session SID — the stored SID can
+// go stale when the cloud session is re-provisioned, which is why a reload would otherwise
+// connect to a dead session (robot frozen) and require a manual reconnect. Falls back to the
+// stored SID (view-only) when there's no valid token. Mirrors the Connect dialog's logic.
+async function restoreSavedSession(app) {
+    const saved = loadSession();
+    const token = loadToken();
+    if (!saved?.sid && !token) {
+        console.log('[RobCo] reload: no saved session to restore');
+        return;
+    }
+    let sid = saved?.sid || '';
+    if (token) {
+        try {
+            const { decodeToken, fetchSession } = await import('../transport/robcoAuth.js');
+            const info = decodeToken(token);
+            if (info && !info.expired) {
+                sid = await fetchSession(token); // current SID for this account
+                console.log('[RobCo] reload: refreshed SID from saved token');
+            } else {
+                console.warn('[RobCo] reload: saved token expired — using stored SID (view-only)');
+            }
+        } catch (e) {
+            console.warn('[RobCo] reload: token→SID refresh failed, using stored SID:', e);
+        }
+    }
+    if (!sid) {
+        console.warn('[RobCo] reload: no usable SID to restore');
+        return;
+    }
+    console.log(`[RobCo] reload: auto-reconnecting ${token ? '(control)' : '(view-only)'}`);
+    try {
+        await connectLiveSession(app, { sid, token: token || undefined });
+    } catch (e) {
+        console.error('[RobCo] reload: auto-reconnect failed:', e);
+    }
+}
+
 export async function maybeLoadRobCo(app) {
     const params = new URLSearchParams(location.search);
     if (params.get('chrome') !== '1') removeOriginalChrome();
     addConnectButton(app);
     if (!params.has('robco')) {
-        // No explicit mode: restore the last connected session across reloads, if any.
-        const saved = loadSession();
-        if (saved?.sid) {
-            const token = loadToken() || undefined;
-            console.log(`[RobCo] restoring saved session ${token ? '(with token)' : '(view-only)'}`);
-            try {
-                await connectLiveSession(app, { sid: saved.sid, token });
-            } catch (e) {
-                console.warn('[RobCo] saved-session reconnect failed:', e);
-            }
-        }
+        await restoreSavedSession(app); // reconnect the last session across reloads
         return;
     }
     const mode = params.get('robco');

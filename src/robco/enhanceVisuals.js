@@ -53,6 +53,14 @@ export async function enhanceVisuals(model, sm) {
         console.warn('[RobCo] render settings panel failed:', e);
     }
 
+    // View panel (geometry / inertia / frames / highlight / interaction / screenshot).
+    try {
+        const { ViewPanel } = await import('./ViewPanel.js');
+        ViewPanel.ensure(sm, model);
+    } catch (e) {
+        console.warn('[RobCo] view panel failed:', e);
+    }
+
     sm.redraw?.();
     sm.render?.();
 }

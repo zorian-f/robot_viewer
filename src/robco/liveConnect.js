@@ -10,7 +10,7 @@ import { RobFlowClient } from '../transport/RobFlowClient.js';
 import { FrequencyMeter } from '../transport/FrequencyMeter.js';
 import { StreamRatePanel } from './StreamRatePanel.js';
 import { RobCoModuleAdapter } from '../adapters/RobCoModuleAdapter.js';
-import { applyAnglesDeg, applyBaseShift } from './poseUtils.js';
+import { applyAnglesDeg } from './poseUtils.js';
 import { DynamicsController } from '../dynamics/DynamicsController.js';
 import { TeachPendant } from './TeachPendant.js';
 import { RobFlowToolsPanel } from './RobFlowToolsPanel.js';
@@ -56,7 +56,6 @@ export async function connectLiveSession(app, opts) {
                 moduleIds: ids,
             });
             app.fileHandler.onModelLoaded(model, { name: 'robco-live.robco' });
-            if (latestBaseShift) applyBaseShift(model, latestBaseShift);
             if (latestAngles) applyAnglesDeg(model, latestAngles);
             console.log(
                 `[RobCo] live robot ready: ${model.links.size} links, ${model.joints.size} joints`,
@@ -65,6 +64,9 @@ export async function connectLiveSession(app, opts) {
                 const { enhanceVisuals } = await import('./enhanceVisuals.js');
                 await enhanceVisuals(model, app.sceneManager);
             } catch (e) { console.warn('[RobCo] enhanceVisuals failed:', e); }
+
+            // enhanceVisuals created the BaseFrame; apply any base shift the robot reported.
+            if (latestBaseShift) window._robcoBaseFrame?.setBaseShiftWS(latestBaseShift);
 
             // Live dynamics dashboard (torque/utilization each frame).
             try {
@@ -104,7 +106,8 @@ export async function connectLiveSession(app, opts) {
 
     socket.on('baseShift', (bs) => {
         latestBaseShift = bs;
-        if (model) applyBaseShift(model, bs);
+        // Single source of truth: the base shift moves the world (inverse), not the robot root.
+        window._robcoBaseFrame?.setBaseShiftWS(bs);
     });
 
     socket.on('payload', (p) => {

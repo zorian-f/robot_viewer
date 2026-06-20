@@ -61,6 +61,16 @@ export async function enhanceVisuals(model, sm) {
         console.warn('[RobCo] view panel failed:', e);
     }
 
+    // Base frame (movable base / world group) + Setup panel (Base/Scene/End-Effector sections).
+    try {
+        const { BaseFrame } = await import('./BaseFrame.js');
+        const { SetupPanel } = await import('./SetupPanel.js');
+        const bf = BaseFrame.ensure(sm, model);
+        SetupPanel.ensure(sm, bf);
+    } catch (e) {
+        console.warn('[RobCo] setup panel failed:', e);
+    }
+
     sm.redraw?.();
     sm.render?.();
 }

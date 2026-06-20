@@ -193,6 +193,8 @@ export async function maybeLoadRobCo(app) {
                 const { WaypointsPanel } = await import('./WaypointsPanel.js');
                 const store = WaypointStore.ensure(app.sceneManager, window._robcoBaseFrame);
                 WaypointsPanel.ensure({ app, teach, base: window._robcoBaseFrame, store, client: null });
+                const { EndEffector } = await import('./EndEffector.js');
+                EndEffector.ensure({ sm: app.sceneManager, model, teach, setupPanel: window._robcoSetupPanel });
             }
         } catch (e) {
             console.error('[RobCo] teach tools failed:', e);

@@ -92,6 +92,8 @@ export async function connectLiveSession(app, opts) {
                     const { WaypointsPanel } = await import('./WaypointsPanel.js');
                     const store = WaypointStore.ensure(app.sceneManager, window._robcoBaseFrame);
                     WaypointsPanel.ensure({ app, teach, base: window._robcoBaseFrame, store, client });
+                    const { EndEffector } = await import('./EndEffector.js');
+                    EndEffector.ensure({ sm: app.sceneManager, model, teach, setupPanel: window._robcoSetupPanel });
                 }
             } catch (e) {
                 console.error('[RobCo] teach pendant failed:', e);

@@ -42,6 +42,7 @@ export class TeachPendant {
         this.enabled = false;
         this.mode = 'translate';
         this.onIk = null; // (res) => void
+        this.toolOffset = null; // Matrix4 flange→tool-tip when a tool defines the TCP, else null
 
         this.target = new THREE.Object3D();
         this._setTargetToTcp();
@@ -75,14 +76,32 @@ export class TeachPendant {
         return this._currentQ().map((r) => (r * 180) / Math.PI);
     }
 
+    /**
+     * Define the TCP as a tool tip offset from the flange (Matrix4) or clear it (null).
+     * When set, the gizmo, captured waypoints, and IK targets are all at the tool tip.
+     */
+    setToolOffset(m4) {
+        this.toolOffset = m4 ? m4.clone() : null;
+        this.syncTcp();
+        this.sm.redraw?.();
+    }
+
+    _tipFromFlange(flangeM4) {
+        return this.toolOffset ? flangeM4.clone().multiply(this.toolOffset) : flangeM4;
+    }
+
+    _flangeFromTip(tipM4) {
+        return this.toolOffset ? tipM4.clone().multiply(this.toolOffset.clone().invert()) : tipM4;
+    }
+
     _tcpPose() {
-        const fk = this.kin.fk(this._currentQ());
+        const baseM = this.tcpBaseMatrix(); // flange, or tool tip when a tool offset is set
         this.model.threeObject.updateMatrixWorld(true);
-        const position = this.model.threeObject.localToWorld(
-            new THREE.Vector3(fk.pos[0], fk.pos[1], fk.pos[2]),
-        );
+        const pos = new THREE.Vector3().setFromMatrixPosition(baseM);
+        const quat = new THREE.Quaternion().setFromRotationMatrix(baseM);
+        const position = this.model.threeObject.localToWorld(pos);
         const qRoot = this.model.threeObject.getWorldQuaternion(new THREE.Quaternion());
-        return { position, quaternion: qRoot.multiply(rowMajorToQuat(fk.mat)) };
+        return { position, quaternion: qRoot.multiply(quat) };
     }
 
     _setTargetToTcp() {
@@ -106,8 +125,12 @@ export class TeachPendant {
         const local = this.model.threeObject.worldToLocal(this.target.position.clone());
         const qRoot = this.model.threeObject.getWorldQuaternion(new THREE.Quaternion());
         const qTarget = this.target.getWorldQuaternion(new THREE.Quaternion());
-        const mat = quatToRowMajor(qRoot.conjugate().multiply(qTarget));
-        const res = this.kin.solveIK([local.x, local.y, local.z], mat, this._currentQ());
+        // Target is the tool tip (base frame); convert to the flange the IK actually solves for.
+        const tipBase = new THREE.Matrix4().compose(local, qRoot.conjugate().multiply(qTarget), new THREE.Vector3(1, 1, 1));
+        const flangeBase = this._flangeFromTip(tipBase);
+        const fpos = new THREE.Vector3().setFromMatrixPosition(flangeBase);
+        const fquat = new THREE.Quaternion().setFromRotationMatrix(flangeBase);
+        const res = this.kin.solveIK([fpos.x, fpos.y, fpos.z], quatToRowMajor(fquat), this._currentQ());
         this._applyQ(res.q);
         this.onIk?.(res);
         this.onPose?.(this.currentAnglesDeg()); // let the dynamics panel recompute for the new pose
@@ -118,22 +141,29 @@ export class TeachPendant {
         if (!this.enabled) this._setTargetToTcp();
     }
 
-    /** Current TCP pose as a 4x4 matrix in the robot base (root-local, native Z-up) frame. */
+    /** Current TCP pose (flange, or tool tip when a tool offset is set) in the base frame. */
     tcpBaseMatrix() {
         const fk = this.kin.fk(this._currentQ());
-        return new THREE.Matrix4().compose(
+        const flange = new THREE.Matrix4().compose(
             new THREE.Vector3(fk.pos[0], fk.pos[1], fk.pos[2]),
             rowMajorToQuat(fk.mat),
             new THREE.Vector3(1, 1, 1),
         );
+        return this._tipFromFlange(flange);
+    }
+
+    // A base-frame target matrix refers to the TCP (tool tip); the IK solves for the flange.
+    _solveTip(m4, seedDeg) {
+        const flange = this._flangeFromTip(m4);
+        const pos = new THREE.Vector3().setFromMatrixPosition(flange);
+        const q = new THREE.Quaternion().setFromRotationMatrix(flange);
+        const seed = seedDeg && seedDeg.length ? seedDeg.map((d) => (d * Math.PI) / 180) : this._currentQ();
+        return this.kin.solveIK([pos.x, pos.y, pos.z], quatToRowMajor(q), seed);
     }
 
     /** Solve IK to a base-frame target matrix and apply it (preview). Returns the IK result. */
     goToBaseMatrix(m4, seedDeg) {
-        const pos = new THREE.Vector3().setFromMatrixPosition(m4);
-        const q = new THREE.Quaternion().setFromRotationMatrix(m4);
-        const seed = seedDeg && seedDeg.length ? seedDeg.map((d) => (d * Math.PI) / 180) : this._currentQ();
-        const res = this.kin.solveIK([pos.x, pos.y, pos.z], quatToRowMajor(q), seed);
+        const res = this._solveTip(m4, seedDeg);
         this._applyQ(res.q);
         this.onPose?.(this.currentAnglesDeg());
         this.syncTcp();
@@ -142,18 +172,12 @@ export class TeachPendant {
 
     /** Test reachability of a base-frame target matrix without moving the arm. */
     checkReachable(m4, seedDeg) {
-        const pos = new THREE.Vector3().setFromMatrixPosition(m4);
-        const q = new THREE.Quaternion().setFromRotationMatrix(m4);
-        const seed = seedDeg && seedDeg.length ? seedDeg.map((d) => (d * Math.PI) / 180) : this._currentQ();
-        return this.kin.solveIK([pos.x, pos.y, pos.z], quatToRowMajor(q), seed).converged;
+        return this._solveTip(m4, seedDeg).converged;
     }
 
     /** Solve IK to a base-frame target WITHOUT moving the arm; returns joint angles (deg). */
     solveBaseMatrix(m4, seedDeg) {
-        const pos = new THREE.Vector3().setFromMatrixPosition(m4);
-        const q = new THREE.Quaternion().setFromRotationMatrix(m4);
-        const seed = seedDeg && seedDeg.length ? seedDeg.map((d) => (d * Math.PI) / 180) : this._currentQ();
-        const res = this.kin.solveIK([pos.x, pos.y, pos.z], quatToRowMajor(q), seed);
+        const res = this._solveTip(m4, seedDeg);
         return { deg: res.q.map((r) => (r * 180) / Math.PI), converged: res.converged, posErr: res.posErr };
     }
 

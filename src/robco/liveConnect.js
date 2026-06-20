@@ -71,6 +71,7 @@ export async function connectLiveSession(app, opts) {
             // Live dynamics dashboard (torque/utilization each frame).
             try {
                 dynamics = await DynamicsController.attach(model);
+                window._robcoDynamics = dynamics; // used by View-panel sliders + end-effector payload
                 if (dynamics && pendingPayload) {
                     dynamics.setPayload(pendingPayload.mass, pendingPayload.com);
                 }
@@ -87,7 +88,7 @@ export async function connectLiveSession(app, opts) {
                 if (teach) teach.onPose = (deg) => dynamics?.updateStatic(deg);
 
                 // Waypoints (capture / list / go-to / group) — world-frame, base-relative.
-                if (teach) {
+                if (teach && window._robcoBaseFrame) {
                     const { WaypointStore } = await import('./waypointStore.js');
                     const { WaypointsPanel } = await import('./WaypointsPanel.js');
                     const store = WaypointStore.ensure(app.sceneManager, window._robcoBaseFrame);

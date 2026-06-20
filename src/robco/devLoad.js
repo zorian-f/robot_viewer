@@ -188,7 +188,7 @@ export async function maybeLoadRobCo(app) {
             if (teach) teach.onPose = (deg) => window._robcoDynamics?.updateStatic?.(deg);
 
             // Waypoints (capture / list / go-to / group) — preview only without a client.
-            if (teach) {
+            if (teach && window._robcoBaseFrame) {
                 const { WaypointStore } = await import('./waypointStore.js');
                 const { WaypointsPanel } = await import('./WaypointsPanel.js');
                 const store = WaypointStore.ensure(app.sceneManager, window._robcoBaseFrame);

@@ -18,6 +18,7 @@
 import * as THREE from 'three';
 
 const ONE = new THREE.Vector3(1, 1, 1);
+const KEY = 'robco-base-pose';
 
 export class BaseFrame {
     static ensure(sm, model) {
@@ -51,6 +52,7 @@ export class BaseFrame {
         this._origin.name = 'robco-world-origin';
         this.worldGroup.add(this._origin);
 
+        this._restore(); // restore a persisted base placement (a live baseShift overrides later)
         this._apply();
     }
 
@@ -92,6 +94,7 @@ export class BaseFrame {
         this.basePos.copy(pos);
         this.baseQuat.copy(quat).normalize();
         this._apply();
+        this._persist();
         this._touch();
     }
 
@@ -115,7 +118,24 @@ export class BaseFrame {
         const inv = this.worldGroup.matrix.clone().invert();
         const s = new THREE.Vector3();
         inv.decompose(this.basePos, this.baseQuat, s);
+        this._persist();
         this._touch();
+    }
+
+    _persist() {
+        try {
+            localStorage.setItem(KEY, JSON.stringify({ pos: this.basePos.toArray(), quat: this.baseQuat.toArray() }));
+        } catch { /* ignore */ }
+    }
+
+    _restore() {
+        try {
+            const s = JSON.parse(localStorage.getItem(KEY));
+            if (s && Array.isArray(s.pos) && Array.isArray(s.quat)) {
+                this.basePos.fromArray(s.pos);
+                this.baseQuat.fromArray(s.quat).normalize();
+            }
+        } catch { /* ignore */ }
     }
 
     /** {x,y,z} mm + {rx,ry,rz} deg (XYZ euler) for the panel. */

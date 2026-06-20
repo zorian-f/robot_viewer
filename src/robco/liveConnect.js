@@ -85,6 +85,14 @@ export async function connectLiveSession(app, opts) {
                 panel.setTeach(teach);
                 // While posing with the gizmo, the dynamics panel follows the previewed pose.
                 if (teach) teach.onPose = (deg) => dynamics?.updateStatic(deg);
+
+                // Waypoints (capture / list / go-to / group) — world-frame, base-relative.
+                if (teach) {
+                    const { WaypointStore } = await import('./waypointStore.js');
+                    const { WaypointsPanel } = await import('./WaypointsPanel.js');
+                    const store = WaypointStore.ensure(app.sceneManager, window._robcoBaseFrame);
+                    WaypointsPanel.ensure({ app, teach, base: window._robcoBaseFrame, store, client });
+                }
             } catch (e) {
                 console.error('[RobCo] teach pendant failed:', e);
             }

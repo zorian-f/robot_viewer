@@ -93,6 +93,7 @@ export class ViewPanel {
         body.append(title('Geometry'));
         body.append(this._check('Visual meshes', (on) => this.sm.visualizationManager?.toggleVisual(on, this._model()), true));
         body.append(this._check('Collision meshes', (on) => this._setCollision(on)));
+        body.append(this._check('Waypoints', (on) => window._robcoWaypointStore?.setVisible(on), true));
 
         // Inertia
         body.append(title('Inertia'));

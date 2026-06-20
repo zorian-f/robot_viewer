@@ -118,6 +118,36 @@ export class TeachPendant {
         if (!this.enabled) this._setTargetToTcp();
     }
 
+    /** Current TCP pose as a 4x4 matrix in the robot base (root-local, native Z-up) frame. */
+    tcpBaseMatrix() {
+        const fk = this.kin.fk(this._currentQ());
+        return new THREE.Matrix4().compose(
+            new THREE.Vector3(fk.pos[0], fk.pos[1], fk.pos[2]),
+            rowMajorToQuat(fk.mat),
+            new THREE.Vector3(1, 1, 1),
+        );
+    }
+
+    /** Solve IK to a base-frame target matrix and apply it (preview). Returns the IK result. */
+    goToBaseMatrix(m4, seedDeg) {
+        const pos = new THREE.Vector3().setFromMatrixPosition(m4);
+        const q = new THREE.Quaternion().setFromRotationMatrix(m4);
+        const seed = seedDeg && seedDeg.length ? seedDeg.map((d) => (d * Math.PI) / 180) : this._currentQ();
+        const res = this.kin.solveIK([pos.x, pos.y, pos.z], quatToRowMajor(q), seed);
+        this._applyQ(res.q);
+        this.onPose?.(this.currentAnglesDeg());
+        this.syncTcp();
+        return res;
+    }
+
+    /** Test reachability of a base-frame target matrix without moving the arm. */
+    checkReachable(m4, seedDeg) {
+        const pos = new THREE.Vector3().setFromMatrixPosition(m4);
+        const q = new THREE.Quaternion().setFromRotationMatrix(m4);
+        const seed = seedDeg && seedDeg.length ? seedDeg.map((d) => (d * Math.PI) / 180) : this._currentQ();
+        return this.kin.solveIK([pos.x, pos.y, pos.z], quatToRowMajor(q), seed).converged;
+    }
+
     setMode(mode) {
         this.mode = mode;
         this.tc.setMode(mode);

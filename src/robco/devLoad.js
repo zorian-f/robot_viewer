@@ -186,6 +186,14 @@ export async function maybeLoadRobCo(app) {
             window._robcoPanel = new RobFlowToolsPanel(app, { teach, client: null });
             // Dragging the gizmo -> recompute the dynamics panel for the posed arm.
             if (teach) teach.onPose = (deg) => window._robcoDynamics?.updateStatic?.(deg);
+
+            // Waypoints (capture / list / go-to / group) — preview only without a client.
+            if (teach) {
+                const { WaypointStore } = await import('./waypointStore.js');
+                const { WaypointsPanel } = await import('./WaypointsPanel.js');
+                const store = WaypointStore.ensure(app.sceneManager, window._robcoBaseFrame);
+                WaypointsPanel.ensure({ app, teach, base: window._robcoBaseFrame, store, client: null });
+            }
         } catch (e) {
             console.error('[RobCo] teach tools failed:', e);
         }

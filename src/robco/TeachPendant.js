@@ -148,6 +148,15 @@ export class TeachPendant {
         return this.kin.solveIK([pos.x, pos.y, pos.z], quatToRowMajor(q), seed).converged;
     }
 
+    /** Solve IK to a base-frame target WITHOUT moving the arm; returns joint angles (deg). */
+    solveBaseMatrix(m4, seedDeg) {
+        const pos = new THREE.Vector3().setFromMatrixPosition(m4);
+        const q = new THREE.Quaternion().setFromRotationMatrix(m4);
+        const seed = seedDeg && seedDeg.length ? seedDeg.map((d) => (d * Math.PI) / 180) : this._currentQ();
+        const res = this.kin.solveIK([pos.x, pos.y, pos.z], quatToRowMajor(q), seed);
+        return { deg: res.q.map((r) => (r * 180) / Math.PI), converged: res.converged, posErr: res.posErr };
+    }
+
     setMode(mode) {
         this.mode = mode;
         this.tc.setMode(mode);

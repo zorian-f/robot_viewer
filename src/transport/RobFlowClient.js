@@ -108,9 +108,37 @@ export class RobFlowClient {
         return res.json();
     }
 
-    /** POST /flows/ — create a flow; returns the created flow (with uuid). */
+    async _patch(path, body) {
+        const res = await fetch(`${this.restBase}${path}`, {
+            method: 'PATCH',
+            headers: this._headers(),
+            credentials: 'omit',
+            body: body !== undefined ? JSON.stringify(body) : undefined,
+        });
+        if (!res.ok) throw new Error(`PATCH ${path} → HTTP ${res.status}`);
+        return res.status === 204 ? null : res.json().catch(() => null);
+    }
+
+    async _delete(path) {
+        const res = await fetch(`${this.restBase}${path}`, {
+            method: 'DELETE', headers: this._headers(), credentials: 'omit',
+        });
+        if (!res.ok) throw new Error(`DELETE ${path} → HTTP ${res.status}`);
+        return res.status;
+    }
+
+    /** POST /flows/ — create a variable-free flow (NewFlow); returns the created flow. */
     createFlow(flow) {
         return this._post('/flows/', flow);
+    }
+
+    /**
+     * POST /flows/import — create a flow that carries its own variables[] (EximFlow).
+     * Required for variable-bound movement nodes. Re-importing a flow whose variables already
+     * exist by NAME throws HTTP 500 — use fresh per-push names or deleteVariable() first.
+     */
+    importFlow(flow) {
+        return this._post('/flows/import?restore_from_backup=False', flow);
     }
 
     /** PUT /flows/{uuid}/run — run an existing flow. */
@@ -121,5 +149,20 @@ export class RobFlowClient {
     /** GET /flows/ — list flows. */
     listFlows() {
         return this._get('/flows/');
+    }
+
+    /** POST /variables — create one variable (HTTP 409 if the name already exists). */
+    createVariable(v) {
+        return this._post('/variables', v);
+    }
+
+    /** PATCH /variables/{uuid} — partial value update (e.g. {currentValue}) without re-import. */
+    updateVariable(uuid, patch) {
+        return this._patch(`/variables/${uuid}`, patch);
+    }
+
+    /** DELETE /variables/{uuid} — remove a variable (use before re-import to dodge the 500). */
+    deleteVariable(uuid) {
+        return this._delete(`/variables/${uuid}`);
     }
 }

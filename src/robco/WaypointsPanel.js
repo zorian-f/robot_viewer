@@ -10,6 +10,7 @@
  * Draggable/minimizable, persisted position key `waypoints`.
  */
 import { makeDraggable } from './draggable.js';
+import { buildWaypointFlow } from '../transport/flowBuilder.js';
 
 const PANEL_CSS =
     'position:fixed;right:332px;top:330px;z-index:3000;width:300px;font:12px/1.4 ui-monospace,Menlo,Consolas,monospace;' +
@@ -103,9 +104,8 @@ export class WaypointsPanel {
         this._status = el('div', 'font-size:11px;color:#9da7b3;min-height:14px;margin-top:6px;');
         body.append(this._status);
 
-        // push section placeholder (filled in Phase 4)
-        this._pushBox = el('div');
-        body.append(this._pushBox);
+        // push section
+        body.append(this._buildPush());
 
         minBtn.addEventListener('click', () => {
             const hidden = body.style.display === 'none';
@@ -181,6 +181,105 @@ export class WaypointsPanel {
                 .catch((e) => { this._status.textContent = `move failed: ${e.message}`; });
         } else {
             this._status.textContent = `preview ${it.name}`;
+        }
+    }
+
+    // --- push to RobFlow ----------------------------------------------
+    _buildPush() {
+        const wrap = el('div', 'border-top:1px solid rgba(255,255,255,0.1);margin-top:8px;padding-top:6px;');
+        wrap.append(el('div', 'font-weight:600;letter-spacing:.04em;opacity:.85;margin-bottom:4px;text-transform:uppercase;font-size:10px;', 'Push → RobFlow'));
+
+        const nameRow = el('div', 'display:flex;align-items:center;gap:6px;margin:2px 0;');
+        nameRow.append(el('span', 'opacity:.8;', 'name'));
+        this._flowName = el('input', 'flex:1;min-width:0;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:4px;color:#e6edf3;padding:2px 4px;font:inherit;');
+        this._flowName.value = 'Viewer Flow';
+        nameRow.append(this._flowName);
+        wrap.append(nameRow);
+
+        // joint | cartesian toggle (default joint — faster, exact; cartesian needs calibration)
+        this._mode = 'joint';
+        const modeRow = el('div', 'display:flex;align-items:center;gap:6px;margin:4px 0;');
+        modeRow.append(el('span', 'opacity:.8;', 'as'));
+        const jointBtn = el('button', BTN, 'joint');
+        const cartBtn = el('button', BTN, 'cartesian');
+        const setMode = (m) => {
+            this._mode = m;
+            jointBtn.style.background = m === 'joint' ? 'rgba(47,129,247,0.35)' : 'rgba(255,255,255,0.06)';
+            cartBtn.style.background = m === 'cartesian' ? 'rgba(47,129,247,0.35)' : 'rgba(255,255,255,0.06)';
+        };
+        jointBtn.addEventListener('click', () => setMode('joint'));
+        cartBtn.addEventListener('click', () => setMode('cartesian'));
+        modeRow.append(jointBtn, cartBtn);
+        wrap.append(modeRow);
+        setMode('joint');
+
+        const va = el('div', 'display:flex;align-items:center;gap:6px;margin:2px 0;font-size:11px;');
+        va.append(el('span', 'opacity:.8;', 'vel'));
+        this._vel = el('input', 'width:48px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:4px;color:#e6edf3;padding:2px 4px;font:inherit;text-align:right;');
+        this._vel.type = 'number'; this._vel.step = '0.05'; this._vel.min = '0'; this._vel.max = '1'; this._vel.value = '0.1';
+        this._acc = this._vel.cloneNode(); this._acc.value = '0.1';
+        va.append(this._vel, el('span', 'opacity:.8;', 'acc'), this._acc);
+        wrap.append(va);
+
+        const btnRow = el('div', 'display:flex;gap:6px;margin-top:4px;');
+        this._pushBtn = el('button', BTN, 'Push');
+        this._pushBtn.addEventListener('click', () => this._push(false));
+        this._runBtn = el('button', BTN, 'Push & Run');
+        this._runBtn.addEventListener('click', () => this._push(true));
+        btnRow.append(this._pushBtn, this._runBtn);
+        wrap.append(btnRow);
+
+        if (!this.client) wrap.append(el('div', 'font-size:10px;color:#6e7681;margin-top:3px;', 'connect a session to push'));
+        return wrap;
+    }
+
+    async _push(run) {
+        if (!this.client) { this._status.textContent = 'no connection — open Connect first'; return; }
+        if (this.store.items.length === 0) { this._status.textContent = 'no waypoints to push'; return; }
+        const mode = this._mode;
+        const velocity = Math.max(0, Math.min(1, +this._vel.value || 0.1));
+        const acceleration = Math.max(0, Math.min(1, +this._acc.value || 0.1));
+
+        // Build per-group item data for the current base placement.
+        const groups = [];
+        const unreachable = [];
+        for (const g of this.store.grouped()) {
+            const items = [];
+            for (const it of g.items) {
+                if (mode === 'cartesian') {
+                    const c = this.store.cartesianBaseFrame(it);
+                    items.push({ name: it.name, position: c.position, orientation: c.orientation });
+                } else {
+                    const s = this.teach.solveBaseMatrix(this.store.baseMatrix(it), it.joints);
+                    if (!s.converged) { unreachable.push(it.name); continue; }
+                    items.push({ name: it.name, joints: s.deg.map((d) => Math.round(d * 1000) / 1000) });
+                }
+            }
+            if (items.length) groups.push({ items });
+        }
+        if (mode === 'joint' && unreachable.length) {
+            this._status.textContent = `unreachable from this base: ${unreachable.join(', ')} — reposition base or remove`;
+            return;
+        }
+
+        const { flow, variableUuids } = buildWaypointFlow(this._flowName.value || 'Viewer Flow', groups, { mode, velocity, acceleration });
+        this._lastPush = { flowUuid: flow.uuid, variableUuids, mode };
+        this._status.textContent = `pushing ${variableUuids.length} ${mode} waypoints…`;
+        this._pushBtn.disabled = this._runBtn.disabled = true;
+        try {
+            const created = await this.client.importFlow(flow);
+            const uuid = created?.uuid || flow.uuid;
+            if (run) {
+                await this.client.runFlow(uuid);
+                this._status.textContent = `running "${flow.name}" (${variableUuids.length} waypoints)`;
+            } else {
+                this._status.textContent = `pushed "${flow.name}" — ${groups.length} node(s), ${variableUuids.length} variables`;
+            }
+        } catch (e) {
+            this._status.textContent = `push failed: ${e.message}`;
+            console.error('[RobCo] waypoint push failed:', e);
+        } finally {
+            this._pushBtn.disabled = this._runBtn.disabled = false;
         }
     }
 

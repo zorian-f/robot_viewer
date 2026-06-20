@@ -140,6 +140,18 @@ export class WaypointStore {
         return this.base.worldToBase(this.worldMatrix(it));
     }
 
+    /** Base-frame cartesian pose for a RobFlow cartesianPose: position mm + orientation deg (XYZ euler). */
+    cartesianBaseFrame(it) {
+        const m = this.baseMatrix(it);
+        const p = new THREE.Vector3().setFromMatrixPosition(m);
+        const e = new THREE.Euler().setFromQuaternion(new THREE.Quaternion().setFromRotationMatrix(m), 'XYZ');
+        const r = (v) => Math.round(v * 1000) / 1000;
+        return {
+            position: [r(p.x * 1000), r(p.y * 1000), r(p.z * 1000)],
+            orientation: [r((e.x * 180) / Math.PI), r((e.y * 180) / Math.PI), r((e.z * 180) / Math.PI)],
+        };
+    }
+
     /** Recompute reachability of every waypoint at the current base via the teach pendant. */
     refreshReachability(teach) {
         if (!teach) return;

@@ -124,6 +124,10 @@ export async function connectLiveSession(app, opts) {
         if (teach) teach.syncTcp();
     });
 
+    // RobFlow's own cartesian TCP pose — used verbatim for cartesian waypoint capture, since
+    // its orientation convention isn't a simple offset from our FK frame (calibration finding).
+    socket.on('pose', (p) => { app._robcoLatestPose = p; });
+
     socket.on('baseShift', (bs) => {
         latestBaseShift = bs;
         // Single source of truth: the base shift moves the world (inverse), not the robot root.

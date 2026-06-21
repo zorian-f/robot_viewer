@@ -123,8 +123,11 @@ export class WaypointsPanel {
         if (!this.teach) { this._status.textContent = 'teach pendant not ready'; return; }
         const baseM = this.teach.tcpBaseMatrix();          // base-frame TCP
         const worldM = this.base.baseToWorld(baseM);        // → world frame (stays fixed on base move)
-        const it = this.store.add(worldM, this.teach.currentAnglesDeg(), null);
-        this._status.textContent = `captured ${it.name}`;
+        // If the robot is actually at this pose (not gizmo-dragging), keep RobFlow's exact
+        // reported cartesian — its orientation convention isn't a simple offset from our FK.
+        const robflowPose = (!this.app._teachActive && this.app._robcoLatestPose) ? this.app._robcoLatestPose : null;
+        const it = this.store.add(worldM, this.teach.currentAnglesDeg(), null, robflowPose);
+        this._status.textContent = `captured ${it.name}${robflowPose ? ' (exact cartesian)' : ''}`;
     }
 
     _renderList() {
@@ -247,7 +250,11 @@ export class WaypointsPanel {
             const items = [];
             for (const it of g.items) {
                 if (mode === 'cartesian') {
-                    const c = this.store.cartesianBaseFrame(it);
+                    // Prefer RobFlow's exact captured cartesian (correct convention); fall back to
+                    // our computed base-frame pose (approximate orientation) for gizmo/base-moved poses.
+                    const c = it.robflowPose && it.robflowPose.position
+                        ? it.robflowPose
+                        : this.store.cartesianBaseFrame(it);
                     items.push({ name: it.name, position: c.position, orientation: c.orientation });
                 } else {
                     const s = this.teach.solveBaseMatrix(this.store.baseMatrix(it), it.joints);

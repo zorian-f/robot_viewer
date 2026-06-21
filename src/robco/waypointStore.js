@@ -47,7 +47,7 @@ export class WaypointStore {
     }
 
     // --- mutate --------------------------------------------------------
-    add(worldMatrix, jointsDeg, name) {
+    add(worldMatrix, jointsDeg, name, robflowPose = null) {
         const pos = new THREE.Vector3();
         const quat = new THREE.Quaternion();
         const s = new THREE.Vector3();
@@ -58,6 +58,10 @@ export class WaypointStore {
             groupId: null,
             worldPose: { pos: pos.toArray(), quat: quat.toArray() },
             joints: (jointsDeg || []).slice(),
+            // RobFlow's exact reported cartesian at capture (position mm + orientation deg), if live.
+            robflowPose: robflowPose && robflowPose.position
+                ? { position: robflowPose.position.slice(), orientation: (robflowPose.orientation || []).slice() }
+                : null,
             reachable: true,
         };
         item._marker = this._makeMarker(item);
@@ -211,7 +215,7 @@ export class WaypointStore {
         try {
             const data = this.items.map((it) => ({
                 id: it.id, name: it.name, groupId: it.groupId,
-                worldPose: it.worldPose, joints: it.joints,
+                worldPose: it.worldPose, joints: it.joints, robflowPose: it.robflowPose || null,
             }));
             localStorage.setItem(KEY, JSON.stringify(data));
         } catch { /* ignore */ }
@@ -224,7 +228,7 @@ export class WaypointStore {
             for (const d of data) {
                 const it = {
                     id: d.id || `wp${++_seq}`, name: d.name, groupId: d.groupId ?? null,
-                    worldPose: d.worldPose, joints: d.joints || [], reachable: true,
+                    worldPose: d.worldPose, joints: d.joints || [], robflowPose: d.robflowPose || null, reachable: true,
                 };
                 const n = parseInt(String(it.id).replace(/\D/g, ''), 10);
                 if (!Number.isNaN(n) && n > _seq) _seq = n;

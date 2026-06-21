@@ -12,6 +12,7 @@
  */
 const SESSION_KEY = 'robco-session';
 const TOKEN_KEY = 'robco-token';
+const CREDS_KEY = 'robco-editor-creds';
 
 export function saveSession(url, sid) {
     try {
@@ -46,6 +47,24 @@ export function loadToken() {
     }
 }
 
+/** Editor login creds (for inner flow-endpoint auth). sessionStorage — cleared on tab close. */
+export function saveCreds(username, password) {
+    try {
+        if (username) sessionStorage.setItem(CREDS_KEY, JSON.stringify({ username, password: password || '' }));
+    } catch {
+        /* storage unavailable */
+    }
+}
+
+export function loadCreds() {
+    try {
+        const s = sessionStorage.getItem(CREDS_KEY);
+        return s ? JSON.parse(s) : null;
+    } catch {
+        return null;
+    }
+}
+
 export function clearSession() {
     try {
         localStorage.removeItem(SESSION_KEY);
@@ -54,6 +73,11 @@ export function clearSession() {
     }
     try {
         sessionStorage.removeItem(TOKEN_KEY);
+    } catch {
+        /* ignore */
+    }
+    try {
+        sessionStorage.removeItem(CREDS_KEY);
     } catch {
         /* ignore */
     }

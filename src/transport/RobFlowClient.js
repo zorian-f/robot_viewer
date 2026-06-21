@@ -26,6 +26,29 @@ export class RobFlowClient {
         return h;
     }
 
+    /**
+     * Inner editor login (RobFlowLink pattern). The Cognito token only authorizes the OUTER
+     * /status; the inner API's write endpoints (flows/import, delete, run) need the session
+     * editor token, returned as `access_token` in the /login body (NOT a cookie — so it works
+     * cross-origin). On success this becomes the Bearer for all subsequent inner calls.
+     * @returns {Promise<string>} the access token
+     */
+    async login(username = 'editor', password = '') {
+        const loginUrl = this.restBase.replace(/\/api\/v[\d.]+\/?$/, '/login');
+        const res = await fetch(loginUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            credentials: 'omit',
+            body: new URLSearchParams({ username, password }).toString(),
+        });
+        if (!res.ok) throw new Error(`/login → HTTP ${res.status} (check editor credentials)`);
+        const data = await res.json();
+        if (!data.access_token) throw new Error('/login returned no access_token');
+        this.token = data.access_token; // replaces the Cognito token for inner-API writes
+        this.loggedIn = true;
+        return data.access_token;
+    }
+
     async _put(path, body) {
         const res = await fetch(`${this.restBase}${path}`, {
             method: 'PUT',

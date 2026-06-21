@@ -13,7 +13,7 @@
 import { RobCoModuleAdapter } from '../adapters/RobCoModuleAdapter.js';
 import { connectLiveSession } from './liveConnect.js';
 import { applyAnglesDeg } from './poseUtils.js';
-import { loadSession, loadToken } from './sessionStore.js';
+import { loadSession, loadToken, loadCreds } from './sessionStore.js';
 
 // RobCo's public geometry CDN (Access-Control-Allow-Origin: *), no session/auth needed.
 const PUBLIC_MODULES_CDN = 'https://robco.studio/modules';
@@ -95,9 +95,13 @@ async function restoreSavedSession(app) {
         console.warn('[RobCo] reload: no usable SID to restore');
         return;
     }
-    console.log(`[RobCo] reload: auto-reconnecting ${token ? '(control)' : '(view-only)'}`);
+    const creds = loadCreds();
+    console.log(`[RobCo] reload: auto-reconnecting ${token ? '(control)' : '(view-only)'}${creds ? ' +editor-login' : ''}`);
     try {
-        await connectLiveSession(app, { sid, token: token || undefined });
+        await connectLiveSession(app, {
+            sid, token: token || undefined,
+            username: creds?.username, password: creds?.password,
+        });
     } catch (e) {
         console.error('[RobCo] reload: auto-reconnect failed:', e);
     }

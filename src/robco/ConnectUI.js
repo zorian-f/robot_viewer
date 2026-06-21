@@ -7,7 +7,7 @@
  */
 import { fetchSession, decodeToken } from '../transport/robcoAuth.js';
 import { connectLiveSession } from './liveConnect.js';
-import { saveSession, loadSession, saveToken, loadToken, clearSession } from './sessionStore.js';
+import { saveSession, loadSession, saveToken, loadToken, saveCreds, loadCreds, clearSession } from './sessionStore.js';
 
 /** Extract the SID from a full session URL, or pass through a bare SID. */
 function parseSid(input) {
@@ -45,6 +45,21 @@ export function openConnectDialog(app) {
         <input id="rc-sid" type="text" placeholder="https://api.robco.studio/.../session/<SID>/…  or  <SID>"
           style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.06);color:#e6edf3;
           border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:8px;font:inherit;"/>
+        <div style="display:flex;gap:8px;margin-top:10px;">
+          <div style="flex:1;">
+            <label style="display:block;opacity:.8;margin-bottom:3px;">Editor user</label>
+            <input id="rc-user" type="text" value="editor"
+              style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.06);color:#e6edf3;
+              border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:8px;font:inherit;"/>
+          </div>
+          <div style="flex:1;">
+            <label style="display:block;opacity:.8;margin-bottom:3px;">Editor password</label>
+            <input id="rc-pass" type="password" placeholder="default: robco"
+              style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.06);color:#e6edf3;
+              border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:8px;font:inherit;"/>
+          </div>
+        </div>
+        <div style="opacity:.6;font-size:11px;margin-top:4px;">Editor login enables pushing/saving flows (read + move work without it).</div>
         <div id="rc-status" style="min-height:18px;margin-top:10px;font-size:12px;opacity:.85;"></div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px;">
           <button id="rc-forget" style="margin-right:auto;background:transparent;color:#9da7b3;border:1px solid rgba(255,255,255,0.15);
@@ -79,6 +94,8 @@ export function openConnectDialog(app) {
     if (saved?.url) $('#rc-sid').value = saved.url;
     const savedToken = loadToken();
     if (savedToken) { $('#rc-token').value = savedToken; showTokenStatus(); }
+    const savedCreds = loadCreds();
+    if (savedCreds) { $('#rc-user').value = savedCreds.username || 'editor'; $('#rc-pass').value = savedCreds.password || ''; }
 
     $('#rc-forget').addEventListener('click', () => {
         clearSession();
@@ -92,6 +109,8 @@ export function openConnectDialog(app) {
     $('#rc-connect').addEventListener('click', async () => {
         const token = $('#rc-token').value.trim();
         const rawSid = $('#rc-sid').value.trim();
+        const username = $('#rc-user').value.trim() || 'editor';
+        const password = $('#rc-pass').value;
         let sid = parseSid(rawSid);
         status('connecting…');
         try {
@@ -100,8 +119,9 @@ export function openConnectDialog(app) {
             // Remember for next reload (browser storage only).
             saveSession(rawSid || sid, sid);
             saveToken(token);
+            saveCreds(username, password);
             close();
-            await connectLiveSession(app, { sid, token: token || undefined });
+            await connectLiveSession(app, { sid, token: token || undefined, username, password });
             console.log('[RobCo] connected via dialog');
         } catch (e) {
             status(`failed: ${e.message}`);

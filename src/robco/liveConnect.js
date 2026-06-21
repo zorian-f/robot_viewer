@@ -28,6 +28,15 @@ export async function connectLiveSession(app, opts) {
     console.log(`[RobCo] live ${session.mode} connect: ${redactSid(session.wsUrl)}`);
 
     const client = new RobFlowClient(session.restBase, { token: opts.token });
+    // Inner editor login unlocks flow push/save/delete (read + move are open via the SID).
+    if (opts.username) {
+        try {
+            await client.login(opts.username, opts.password || '');
+            console.log('[RobCo] editor login ok — flow push/save enabled');
+        } catch (e) {
+            console.warn('[RobCo] editor login failed — push/save disabled (read + move still work):', e.message);
+        }
+    }
     const panel = new RobFlowToolsPanel(app, { client });
     const socket = new RobFlowSocket(session.wsUrl);
 

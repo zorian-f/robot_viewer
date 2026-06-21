@@ -270,13 +270,16 @@ export class WaypointsPanel {
             const created = await this.client.importFlow(flow);
             const uuid = created?.uuid || flow.uuid;
             if (run) {
+                await this.client.setDesiredRobotState(2).catch(() => {}); // ensure operational
                 await this.client.runFlow(uuid);
                 this._status.textContent = `running "${flow.name}" (${variableUuids.length} waypoints)`;
             } else {
                 this._status.textContent = `pushed "${flow.name}" — ${groups.length} node(s), ${variableUuids.length} variables`;
             }
         } catch (e) {
-            this._status.textContent = `push failed: ${e.message}`;
+            const hint = /\b40[13]\b/.test(e.message)
+                ? ' — editor login required (reconnect with the editor password)' : '';
+            this._status.textContent = `push failed: ${e.message}${hint}`;
             console.error('[RobCo] waypoint push failed:', e);
         } finally {
             this._pushBtn.disabled = this._runBtn.disabled = false;

@@ -20,16 +20,29 @@ export async function enhanceVisuals(model, sm) {
     renderer.toneMappingExposure = 1.0;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
 
-    // Bright studio environment (softbox highlights) so the polished-aluminium body pops the way
-    // RobCo's baked HDR makes it — instead of the dim, flat default RoomEnvironment.
+    // Environment for IBL. Prefer a local equirectangular HDRI/EXR at public/env/studio.exr (e.g.
+    // RobCo's own studio map — gitignored, never committed) for the exact look; otherwise fall back
+    // to the calibrated procedural studio env. The Render panel can also load one at runtime.
     try {
-        const { createStudioEnvironment } = await import('./studioEnvironment.js');
         const pmrem = new THREE.PMREMGenerator(renderer);
-        const envScene = createStudioEnvironment();
-        scene.environment = pmrem.fromScene(envScene, 0.04).texture;
+        let envTex = null;
+        const url = `${import.meta.env?.BASE_URL ?? '/'}env/studio.exr`;
+        try {
+            const { EXRLoader } = await import('three/examples/jsm/loaders/EXRLoader.js');
+            const tex = await new Promise((res, rej) => new EXRLoader().load(url, res, undefined, rej));
+            tex.mapping = THREE.EquirectangularReflectionMapping;
+            envTex = pmrem.fromEquirectangular(tex).texture;
+            tex.dispose();
+            console.log('[RobCo] environment: studio.exr (exact)');
+        } catch {
+            const { createStudioEnvironment } = await import('./studioEnvironment.js');
+            envTex = pmrem.fromScene(createStudioEnvironment(), 0.04).texture;
+            console.log('[RobCo] environment: procedural studio (studio.exr not found)');
+        }
+        scene.environment = envTex;
         pmrem.dispose();
     } catch (e) {
-        console.warn('[RobCo] studio environment failed:', e);
+        console.warn('[RobCo] environment setup failed:', e);
     }
 
     model.threeObject?.traverse((o) => {

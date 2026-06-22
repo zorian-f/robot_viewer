@@ -65,6 +65,13 @@ export class ViewPanel {
 
     _render() { this.sm.redraw?.(); this.sm.render?.(); }
 
+    /** Toggle the reference grid (kept in sync with the EnvironmentManager copy). */
+    _setGridVisible(on) {
+        const grid = this.sm.referenceGrid || this.sm.environmentManager?.referenceGrid;
+        if (grid) grid.visible = on;
+        this._render();
+    }
+
     /** Lazy-load the convex-decomposition collision STLs on first enable, then toggle them. */
     async _setCollision(on) {
         const nodes = this._model()?.userData?.moduleNodes || [];
@@ -95,6 +102,11 @@ export class ViewPanel {
         body.append(this._check('Visual meshes', (on) => this.sm.visualizationManager?.toggleVisual(on, this._model()), true));
         body.append(this._check('Collision meshes', (on) => this._setCollision(on)));
         body.append(this._check('Waypoints', (on) => window._robcoWaypointStore?.setVisible(on), true));
+
+        // Scene
+        body.append(title('Scene'));
+        const grid = this.sm.referenceGrid || this.sm.environmentManager?.referenceGrid;
+        body.append(this._check('Reference grid', (on) => this._setGridVisible(on), grid ? grid.visible !== false : true));
 
         // Inertia
         body.append(title('Inertia'));

@@ -38,9 +38,15 @@ export async function enhanceVisuals(model, sm) {
         const mats = Array.isArray(o.material) ? o.material : [o.material];
         for (const m of mats) {
             if (!m) continue;
-            if ('envMapIntensity' in m) m.envMapIntensity = 1.25;
-            // Flat-shaded GLBs sometimes import without smooth normals; keep as-authored but
-            // ensure the material recompiles for the new tone mapping / environment.
+            // The arm is dominated by polished "Alu" (metallic 0.99, roughness 0.25), which shows
+            // mostly the reflected environment — so lift the IBL so it reads as bright metal, not grey.
+            if ('envMapIntensity' in m) m.envMapIntensity = 1.4;
+            // The GLBs author status LEDs as materials named "Emission …" but ship them without an
+            // emissiveFactor, so they render as flat grey/green. Make them actually glow.
+            if (m.name && /emission/i.test(m.name) && m.emissive && m.color) {
+                m.emissive.copy(m.color);
+                m.emissiveIntensity = /gr[üu]n|green/i.test(m.name) ? 1.4 : 1.0;
+            }
             m.needsUpdate = true;
         }
     });

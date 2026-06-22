@@ -1,24 +1,30 @@
 /**
- * A bright product-viz studio environment for PMREM, replacing three's dim RoomEnvironment.
+ * A self-contained studio environment for PMREM, calibrated to RobCo Studio's actual baked HDRI.
  *
- * RobCo Studio lights its arm purely by a bright baked HDR through `scene.environment` (ACES,
- * no punctual lights, no shadows). The arm body is polished aluminium (metallic 0.99, rough
- * 0.25), so it shows almost only the reflected environment — a dim, flat env reads as grey/
- * gloomy. This builds a soft light-grey room with a large overhead softbox + side/front fill
- * panels (HDR values >1, preserved by the PMREM half-float target) so polished metal picks up
- * crisp highlights and a clean gradient — approximating RobCo's HDR look without any asset.
+ * The real env (a 2048×1024 Cycles equirectangular EXR) was decoded and profiled:
+ *   - a calm, near-neutral grey FIELD at median ≈ 0.089 linear luminance (middle 50% ≈ 0.075–0.112),
+ *   - a small (~1%) concentrated bright KEY peaking ~207 linear → the specular highlights,
+ *   - solid-angle-weighted average luminance ≈ 0.54,
+ *   - colour within ±1% of neutral with a faint warm lean (R 1.008, G 0.998, B 1.001).
+ * That dark-field + bright-key ratio is what makes polished aluminium read as crisp metal rather
+ * than flat grey. We approximate it with unlit (MeshBasic, toneMapped:false → exact linear
+ * radiance baked into the half-float PMREM target) panels. The Render panel can also load RobCo's
+ * exact EXR for a byte-identical match.
  *
  * Pass the returned scene to `PMREMGenerator.fromScene(scene, 0.04)`.
  */
 import * as THREE from 'three';
 
-function panel(scene, w, h, d, value, pos) {
+const LIN = THREE.LinearSRGBColorSpace;
+const WARM = [1.008, 0.998, 1.001]; // faint warm-neutral lean from the decoded profile
+
+function emitter(scene, w, h, d, lum, pos) {
     const m = new THREE.Mesh(
         new THREE.BoxGeometry(w, h, d),
-        new THREE.MeshBasicMaterial(),
+        new THREE.MeshBasicMaterial({ toneMapped: false }), // bake true linear radiance, no tone map
     );
-    m.material.color.setRGB(value, value, value); // value may exceed 1 → HDR highlight
-    m.position.set(pos[0], pos[1], pos[2]);
+    m.material.color.setRGB(lum * WARM[0], lum * WARM[1], lum * WARM[2], LIN);
+    if (pos) m.position.set(pos[0], pos[1], pos[2]);
     scene.add(m);
     return m;
 }
@@ -26,22 +32,21 @@ function panel(scene, w, h, d, value, pos) {
 export function createStudioEnvironment() {
     const scene = new THREE.Scene();
 
-    // Enclosing room: light-grey diffuse fill from every direction (soft ambient base).
+    // FIELD: calm dark-grey ambient from all directions (median ≈ 0.089 linear). Enclosing box.
     const room = new THREE.Mesh(
         new THREE.BoxGeometry(20, 18, 20),
-        new THREE.MeshStandardMaterial({ side: THREE.BackSide, color: 0xd9dde2, roughness: 1, metalness: 0 }),
+        new THREE.MeshBasicMaterial({ side: THREE.BackSide, toneMapped: false }),
     );
+    room.material.color.setRGB(0.09 * WARM[0], 0.09 * WARM[1], 0.09 * WARM[2], LIN);
     scene.add(room);
 
-    // Large overhead softbox — the main highlight source.
-    panel(scene, 14, 0.4, 14, 3.0, [0, 8.6, 0]);
-    // Side fills (rim highlights), slightly off-axis + asymmetric for natural variation.
-    panel(scene, 0.4, 9, 9, 1.7, [-9.6, 2.5, 1]);
-    panel(scene, 0.4, 9, 9, 1.2, [9.6, 2.5, -2]);
-    // Soft front fill so the face toward the default camera isn't dark.
-    panel(scene, 9, 6, 0.4, 0.9, [0, 3, 9.6]);
-    // Faint back light for edge separation.
-    panel(scene, 9, 5, 0.4, 0.7, [0, 3.5, -9.6]);
+    // KEY: soft, bright overhead softbox → the specular highlight + soft directional read.
+    // (Brightness lifts the weighted-average luminance toward ~0.54; tune via the env-IBL slider.)
+    emitter(scene, 8, 0.4, 8, 10.0, [0, 8.6, 0]);
+    // Gentle fills for a slight gradient (the p90 ≈ 0.22 tail), not flat.
+    emitter(scene, 0.4, 8, 8, 0.6, [-9.6, 3, 1]);
+    emitter(scene, 0.4, 8, 8, 0.45, [9.6, 3, -2]);
+    emitter(scene, 8, 5, 0.4, 0.4, [0, 3, 9.6]);
 
     return scene;
 }

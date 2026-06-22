@@ -14,21 +14,22 @@ export async function enhanceVisuals(model, sm) {
     if (!sm?.renderer || !sm?.scene) return;
     const { renderer, scene } = sm;
 
-    renderer.toneMapping = THREE.NeutralToneMapping; // crisp product look (panel can change it)
-    renderer.toneMappingExposure = 1.1;
+    // Match RobCo Studio's recipe: ACES Filmic at exposure 1.0, lit purely by a bright studio
+    // environment (no punctual lights / shadows by default). The panel can change all of this.
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.0;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
 
-    // Studio environment for image-based lighting (much nicer reflections than the flat default).
+    // Bright studio environment (softbox highlights) so the polished-aluminium body pops the way
+    // RobCo's baked HDR makes it — instead of the dim, flat default RoomEnvironment.
     try {
-        const { RoomEnvironment } = await import('three/examples/jsm/environments/RoomEnvironment.js');
+        const { createStudioEnvironment } = await import('./studioEnvironment.js');
         const pmrem = new THREE.PMREMGenerator(renderer);
-        const envScene = new RoomEnvironment();
-        const env = pmrem.fromScene(envScene, 0.04).texture;
-        scene.environment = env;
+        const envScene = createStudioEnvironment();
+        scene.environment = pmrem.fromScene(envScene, 0.04).texture;
         pmrem.dispose();
-        envScene.dispose?.();
     } catch (e) {
-        console.warn('[RobCo] studio environment upgrade failed:', e);
+        console.warn('[RobCo] studio environment failed:', e);
     }
 
     model.threeObject?.traverse((o) => {
@@ -38,9 +39,9 @@ export async function enhanceVisuals(model, sm) {
         const mats = Array.isArray(o.material) ? o.material : [o.material];
         for (const m of mats) {
             if (!m) continue;
-            // The arm is dominated by polished "Alu" (metallic 0.99, roughness 0.25), which shows
-            // mostly the reflected environment — so lift the IBL so it reads as bright metal, not grey.
-            if ('envMapIntensity' in m) m.envMapIntensity = 1.4;
+            // RobCo applies no envMapIntensity override (GLB default 1.0); the bright studio env
+            // does the work. The Render panel can still scale it live.
+            if ('envMapIntensity' in m) m.envMapIntensity = 1.0;
             // The GLBs author status LEDs as materials named "Emission …" but ship them without an
             // emissiveFactor, so they render as flat grey/green. Make them actually glow.
             if (m.name && /emission/i.test(m.name) && m.emissive && m.color) {

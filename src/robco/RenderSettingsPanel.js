@@ -14,11 +14,11 @@ const TONE = {
     Reinhard: THREE.ReinhardToneMapping,
     Cineon: THREE.CineonToneMapping,
 };
-const KEY = 'robco-render-settings-v3'; // bumped so the crisper defaults replace the old gloomy ones
-// Crisp studio look: warm-white background + Khronos PBR-Neutral tone mapping (preserves colour
-// and contrast for product/CAD viz, unlike ACES which desaturates and looks gloomy) + a proper
-// directional key light (the old 0.6 left the arm underlit and soft) over the IBL environment.
-const DEFAULTS = { exposure: 1.1, envIntensity: 1.4, tone: 'Neutral', keyLight: 1.8, ambient: 0.45, shadows: true, background: '#FCF9F7' };
+const KEY = 'robco-render-settings-v4'; // bumped to adopt the RobCo-matched recipe
+// Matches RobCo Studio's visualizer (reverse-engineered from its bundle): ACES Filmic at
+// exposure 1.0, lit purely by the bright studio environment (no key light / shadows), warm
+// off-white background. Re-enable key/ambient/shadows here if you want our extra shading.
+const DEFAULTS = { exposure: 1.0, envIntensity: 1.0, tone: 'ACES', keyLight: 0.0, ambient: 0.0, shadows: false, background: '#FCF9F7' };
 
 const PANEL_CSS =
     'position:fixed;right:16px;bottom:16px;z-index:3000;width:240px;font:12px/1.4 ui-monospace,Menlo,Consolas,monospace;' +

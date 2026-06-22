@@ -157,8 +157,10 @@ export async function connectLiveSession(app, opts) {
         if (state === 'open') {
             console.log(`[RobCo] WS open: ${redactSid(session.wsUrl)}`);
             // Persist any working cloud session so a reload auto-reconnects to THIS sid.
+            // Pass null for the URL so saveSession keeps the human-readable URL the user
+            // typed in the dialog (it only updates the SID here).
             if (opts.sid) {
-                saveSession(opts.sid, opts.sid);
+                saveSession(null, opts.sid);
                 saveToken(opts.token);
             }
         } else {

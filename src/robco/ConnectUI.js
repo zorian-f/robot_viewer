@@ -101,6 +101,8 @@ export function openConnectDialog(app) {
         clearSession();
         $('#rc-sid').value = '';
         $('#rc-token').value = '';
+        $('#rc-user').value = 'editor';
+        $('#rc-pass').value = '';
         status('cleared saved session', true);
     });
     $('#rc-cancel').addEventListener('click', close);

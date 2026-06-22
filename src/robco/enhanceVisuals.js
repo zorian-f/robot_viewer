@@ -14,8 +14,8 @@ export async function enhanceVisuals(model, sm) {
     if (!sm?.renderer || !sm?.scene) return;
     const { renderer, scene } = sm;
 
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.15;
+    renderer.toneMapping = THREE.NeutralToneMapping; // crisp product look (panel can change it)
+    renderer.toneMappingExposure = 1.1;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
 
     // Studio environment for image-based lighting (much nicer reflections than the flat default).

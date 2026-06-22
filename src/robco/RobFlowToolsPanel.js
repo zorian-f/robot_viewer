@@ -173,7 +173,7 @@ export class RobFlowToolsPanel {
         // --- Jog (needs client; press-and-hold per joint, requires JOGGING/TEACH mode) ---
         this._jogBox = el('div');
         this._jogBox.append(sectionTitle('Jog (hold)'));
-        this._jogSpeed = slider('speed', 0.01, 1, 0.01, 0.1);
+        this._jogSpeed = slider('speed', 0.01, 1, 0.01, 1);
         this._jogBox.append(this._jogSpeed.row);
         this._jogRows = el('div');
         this._jogBox.append(this._jogRows);

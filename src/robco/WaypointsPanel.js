@@ -219,8 +219,8 @@ export class WaypointsPanel {
         const va = el('div', 'display:flex;align-items:center;gap:6px;margin:2px 0;font-size:11px;');
         va.append(el('span', 'opacity:.8;', 'vel'));
         this._vel = el('input', 'width:48px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:4px;color:#e6edf3;padding:2px 4px;font:inherit;text-align:right;');
-        this._vel.type = 'number'; this._vel.step = '0.05'; this._vel.min = '0'; this._vel.max = '1'; this._vel.value = '0.1';
-        this._acc = this._vel.cloneNode(); this._acc.value = '0.1';
+        this._vel.type = 'number'; this._vel.step = '0.05'; this._vel.min = '0'; this._vel.max = '1'; this._vel.value = '1';
+        this._acc = this._vel.cloneNode(); this._acc.value = '1';
         va.append(this._vel, el('span', 'opacity:.8;', 'acc'), this._acc);
         wrap.append(va);
 
@@ -240,8 +240,8 @@ export class WaypointsPanel {
         if (!this.client) { this._status.textContent = 'no connection — open Connect first'; return; }
         if (this.store.items.length === 0) { this._status.textContent = 'no waypoints to push'; return; }
         const mode = this._mode;
-        const velocity = Math.max(0, Math.min(1, +this._vel.value || 0.1));
-        const acceleration = Math.max(0, Math.min(1, +this._acc.value || 0.1));
+        const velocity = Math.max(0, Math.min(1, +this._vel.value || 1));
+        const acceleration = Math.max(0, Math.min(1, +this._acc.value || 1));
 
         // Build per-group item data for the current base placement.
         const groups = [];

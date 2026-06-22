@@ -174,9 +174,28 @@ export class TeachPendant {
         return res;
     }
 
-    /** Test reachability of a base-frame target matrix without moving the arm. */
+    /**
+     * Test reachability of a base-frame target matrix without moving the arm. Tries the captured
+     * seed first (fast path), then a few spread seeds so a poor seed after a large base move
+     * doesn't flag a genuinely reachable pose as unreachable.
+     */
     checkReachable(m4, seedDeg) {
-        return this._solveTip(m4, seedDeg).converged;
+        if (this._solveTip(m4, seedDeg).converged) return true;
+        for (const alt of this._altSeeds()) {
+            if (this._solveTip(m4, alt).converged) return true;
+        }
+        return false;
+    }
+
+    /** A small spread of fallback IK seeds (degrees) for the reachability retry. */
+    _altSeeds() {
+        const n = this.jointNames.length;
+        return [
+            this.currentAnglesDeg(),                                  // current pose
+            new Array(n).fill(0),                                     // home
+            Array.from({ length: n }, (_, i) => (i % 2 ? 90 : -90)),  // spread A
+            Array.from({ length: n }, (_, i) => (i % 2 ? -120 : 60)), // spread B
+        ];
     }
 
     /** Solve IK to a base-frame target WITHOUT moving the arm; returns joint angles (deg). */

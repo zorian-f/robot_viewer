@@ -5,6 +5,7 @@
  */
 import * as THREE from 'three';
 import { makeDraggable } from './draggable.js';
+import { createStudioEnvironment } from './studioEnvironment.js';
 
 const TONE = {
     None: THREE.NoToneMapping,
@@ -96,6 +97,20 @@ export class RenderSettingsPanel {
         bgRow.append(bg, bgReset);
         body.append(bgRow);
 
+        // Environment map: load an HDRI/EXR equirectangular for IBL (e.g. RobCo's own studio.exr,
+        // extracted locally), or reset to the built-in procedural studio. Background stays solid.
+        const envRow = el('div', 'display:flex;align-items:center;gap:6px;margin:5px 0;');
+        const envFile = el('input'); envFile.type = 'file'; envFile.accept = '.exr,.hdr'; envFile.style.display = 'none';
+        envFile.addEventListener('change', () => { if (envFile.files?.[0]) this._loadEnvFile(envFile.files[0]); });
+        const envBtn = el('button', 'flex:1;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);color:#e6edf3;border-radius:5px;cursor:pointer;font:inherit;padding:3px 6px;', 'Load HDRI/EXR…');
+        envBtn.addEventListener('click', () => envFile.click());
+        const envReset = el('button', 'background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);color:#9da7b3;border-radius:5px;cursor:pointer;font:inherit;padding:3px 6px;', 'Studio');
+        envReset.addEventListener('click', () => this._applyStudioEnv());
+        envRow.append(el('span', 'opacity:.8;width:62px;', 'env map'), envBtn, envReset, envFile);
+        body.append(envRow);
+        this._envStatus = el('div', 'font-size:10px;color:#6e7681;margin:-2px 0 4px;min-height:12px;');
+        body.append(this._envStatus);
+
         body.append(this._slider('exposure', 0, 3, 0.05, this.s.exposure, (v) => { this.s.exposure = v; this._applyExposure(); this._save(); this.sm.render?.(); }));
         body.append(this._slider('env IBL', 0, 3, 0.05, this.s.envIntensity, (v) => { this.s.envIntensity = v; this._applyEnv(); this._save(); this.sm.render?.(); }));
         body.append(this._slider('key light', 0, 8, 0.1, this.s.keyLight, (v) => { this.s.keyLight = v; this._applyLights(); this._save(); this.sm.render?.(); }));
@@ -116,6 +131,49 @@ export class RenderSettingsPanel {
         document.body.appendChild(root);
         this.root = root;
         makeDraggable(root, title, 'render');
+    }
+
+    // --- environment ----------------------------------------------------
+    /** Load an equirectangular HDRI (.hdr) or EXR (.exr) as scene.environment via PMREM. */
+    async _loadEnvFile(file) {
+        this._envStatus.textContent = `loading ${file.name}…`;
+        const url = URL.createObjectURL(file);
+        try {
+            const isExr = /\.exr$/i.test(file.name);
+            const mod = isExr
+                ? await import('three/examples/jsm/loaders/EXRLoader.js')
+                : await import('three/examples/jsm/loaders/RGBELoader.js');
+            const Loader = isExr ? mod.EXRLoader : mod.RGBELoader;
+            const tex = await new Promise((res, rej) => new Loader().load(url, res, undefined, rej));
+            tex.mapping = THREE.EquirectangularReflectionMapping;
+            const pmrem = new THREE.PMREMGenerator(this.sm.renderer);
+            const rt = pmrem.fromEquirectangular(tex);
+            this.sm.scene.environment = rt.texture;
+            tex.dispose();
+            pmrem.dispose();
+            this._applyEnv(); // re-assert envMapIntensity on materials
+            this._envStatus.textContent = `env: ${file.name}`;
+            this.sm.render?.();
+        } catch (e) {
+            console.warn('[RobCo] env load failed:', e);
+            this._envStatus.textContent = `load failed: ${e.message}`;
+        } finally {
+            URL.revokeObjectURL(url);
+        }
+    }
+
+    /** Reset to the built-in procedural studio environment. */
+    _applyStudioEnv() {
+        try {
+            const pmrem = new THREE.PMREMGenerator(this.sm.renderer);
+            this.sm.scene.environment = pmrem.fromScene(createStudioEnvironment(), 0.04).texture;
+            pmrem.dispose();
+            this._applyEnv();
+            if (this._envStatus) this._envStatus.textContent = 'env: built-in studio';
+            this.sm.render?.();
+        } catch (e) {
+            console.warn('[RobCo] studio env reset failed:', e);
+        }
     }
 
     // --- apply ----------------------------------------------------------

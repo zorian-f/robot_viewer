@@ -12,6 +12,7 @@
 import * as THREE from 'three';
 import { ModelLoaderFactory } from '../loaders/ModelLoaderFactory.js';
 import { makeDraggable } from './draggable.js';
+import { registerManipulator, activateManipulator, deactivateManipulator } from './manipulators.js';
 
 const PANEL_CSS =
     'position:fixed;left:16px;top:64px;z-index:3000;width:250px;font:12px/1.4 ui-monospace,Menlo,Consolas,monospace;' +
@@ -113,7 +114,18 @@ export class ViewPanel {
 
         // Interaction
         body.append(title('Interaction'));
-        body.append(this._check('Drag joints (FK)', (on) => this._setFkDrag(on)));
+        const fkRow = this._check('Drag joints (FK)', (on) => this._setFkDrag(on));
+        this._fkCheckbox = fkRow.querySelector('input');
+        body.append(fkRow);
+        // Arbiter: another manipulator activating turns FK drag off (+ uncheck the box).
+        registerManipulator('fk-drag', () => {
+            if (this._fkDrag?.enabled) {
+                this._fkDrag.enabled = false;
+                if (this._fkCheckbox) this._fkCheckbox.checked = false;
+                if (window._robcoApp) window._robcoApp._teachActive = false;
+                if (this.sm?.controls) this.sm.controls.enabled = true;
+            }
+        });
         const sliderToggle = el('button', BTN + 'margin:4px 0;', 'Joint sliders ▾');
         body.append(sliderToggle);
         this._sliderBox = el('div', 'display:none;');
@@ -236,8 +248,16 @@ export class ViewPanel {
         if (on && !this._fkDrag) {
             const { PointerJointDragControls } = await import('../utils/JointDragControls.js');
             this._fkDrag = new PointerJointDragControls(this.sm.scene, this.sm.camera, this.sm.renderer.domElement, this._model());
+            // Disable OrbitControls only while actually dragging a joint, so the camera
+            // doesn't orbit at the same time; restore it on release.
+            this._fkDrag.onDragStart = () => { if (this.sm.controls) this.sm.controls.enabled = false; };
+            this._fkDrag.onDragEnd = () => { if (this.sm.controls) this.sm.controls.enabled = true; };
         }
         if (this._fkDrag) this._fkDrag.enabled = on;
+        if (on) activateManipulator('fk-drag'); // turn off teach gizmo / Setup gizmo
+        else { deactivateManipulator('fk-drag'); if (this.sm?.controls) this.sm.controls.enabled = true; }
+        // Pause the live WS mirror while FK-dragging so streamed angles don't fight the drag.
+        if (window._robcoApp) window._robcoApp._teachActive = on;
     }
 
     _screenshot() {

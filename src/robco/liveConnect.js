@@ -24,6 +24,7 @@ const redactSid = (url) => url.replace(/session\/ws\/[^/]+/, 'session/ws/<SID>')
  * @returns {Promise<RobFlowSocket>}
  */
 export async function connectLiveSession(app, opts) {
+    window._robcoApp = app; // referenced by ViewPanel FK-drag to pause the live mirror
     const session = resolveSession(opts);
     console.log(`[RobCo] live ${session.mode} connect: ${redactSid(session.wsUrl)}`);
 

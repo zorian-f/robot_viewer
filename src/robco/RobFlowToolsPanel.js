@@ -58,6 +58,8 @@ export class RobFlowToolsPanel {
         if (teach) {
             teach.onIk = (res) => this._setIk(res);
             teach.onModeChange = (m) => this._setMode(m);
+            // Keep the Teach button in sync when the arbiter turns the gizmo off.
+            teach.onEnabledChange = (on) => this._teachVisible(on);
             if (this.client) this._buildJogRows(teach.jointNames);
         }
     }

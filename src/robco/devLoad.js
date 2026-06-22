@@ -108,6 +108,7 @@ async function restoreSavedSession(app) {
 }
 
 export async function maybeLoadRobCo(app) {
+    window._robcoApp = app; // referenced by ViewPanel FK-drag to pause the live mirror
     const params = new URLSearchParams(location.search);
     if (params.get('chrome') !== '1') removeOriginalChrome();
     addConnectButton(app);

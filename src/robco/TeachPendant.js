@@ -11,6 +11,7 @@
 import * as THREE from 'three';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
 import { MujocoKinematics } from '../dynamics/MujocoKinematics.js';
+import { registerManipulator, activateManipulator } from './manipulators.js';
 
 function quatToRowMajor(q) {
     const e = new THREE.Matrix4().makeRotationFromQuaternion(q).elements;
@@ -65,6 +66,9 @@ export class TeachPendant {
             if (e.key === 'w' || e.key === 'W') this.setMode('translate');
             else if (e.key === 'e' || e.key === 'E') this.setMode('rotate');
         };
+
+        // Arbiter: another manipulator activating turns this gizmo off.
+        registerManipulator('teach', () => { if (this.enabled) this.setEnabled(false); });
     }
 
     _currentQ() {
@@ -193,11 +197,14 @@ export class TeachPendant {
         this.tc.visible = on;
         this.tc.enabled = on;
         if (on) {
+            activateManipulator('teach'); // turn off the Setup gizmo / FK drag
             this._setTargetToTcp();
             window.addEventListener('keydown', this._onKey);
         } else {
             window.removeEventListener('keydown', this._onKey);
+            if (this.sm?.controls) this.sm.controls.enabled = true; // never leave orbit disabled
         }
+        this.onEnabledChange?.(on);
     }
 
     dispose() {

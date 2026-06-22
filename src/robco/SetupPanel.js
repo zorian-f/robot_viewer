@@ -12,6 +12,7 @@
 import * as THREE from 'three';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
 import { makeDraggable } from './draggable.js';
+import { registerManipulator, activateManipulator, deactivateManipulator } from './manipulators.js';
 
 const PANEL_CSS =
     'position:fixed;left:16px;top:330px;z-index:3000;width:272px;font:12px/1.4 ui-monospace,Menlo,Consolas,monospace;' +
@@ -53,6 +54,8 @@ export class SetupPanel {
         this.scene = null; // loaded GLB group
         this._editing = null; // current gizmo target name
         this._build();
+        // Arbiter: another manipulator activating closes this gizmo.
+        registerManipulator('setup-gizmo', () => this._stopEdit());
     }
 
     _build() {
@@ -110,6 +113,7 @@ export class SetupPanel {
     }
 
     _edit(name, target, modes, onChange) {
+        activateManipulator('setup-gizmo'); // turn off teach gizmo / FK drag
         const tc = this._ensureGizmo();
         tc.attach(target);
         tc.setMode(modes[0]);
@@ -131,6 +135,8 @@ export class SetupPanel {
         this._editing = null;
         this._onGizmo = null;
         this._modeBar.style.display = 'none';
+        if (this.sm?.controls) this.sm.controls.enabled = true; // never leave orbit disabled
+        deactivateManipulator('setup-gizmo');
         this.sm.redraw?.();
     }
 

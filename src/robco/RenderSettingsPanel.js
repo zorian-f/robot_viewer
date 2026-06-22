@@ -53,13 +53,26 @@ export class RenderSettingsPanel {
         try { localStorage.setItem(KEY, JSON.stringify(this.s)); } catch { /* ignore */ }
     }
 
-    _slider(label, min, max, step, val, onInput) {
-        const row = el('div', 'display:grid;grid-template-columns:62px 1fr 36px;gap:6px;align-items:center;margin:5px 0;');
+    /**
+     * @param {number} [curve=1] - >1 makes the slider perceptual: the bottom of the travel gets
+     *   fine resolution and the top coarse (value = min + (max-min)·pos^curve). Useful for
+     *   envMapIntensity, where small low-end changes are visually large.
+     */
+    _slider(label, min, max, step, val, onInput, curve = 1) {
+        const row = el('div', 'display:grid;grid-template-columns:62px 1fr 40px;gap:6px;align-items:center;margin:5px 0;');
         row.append(el('span', 'opacity:.8;', label));
         const input = el('input', 'width:100%;accent-color:#2f81f7;');
-        input.type = 'range'; input.min = min; input.max = max; input.step = step; input.value = val;
-        const out = el('span', 'text-align:right;opacity:.9;', (+val).toFixed(2));
-        input.addEventListener('input', () => { out.textContent = (+input.value).toFixed(2); onInput(+input.value); });
+        const fmt = (v) => (Math.abs(v) < 0.1 ? (+v).toFixed(3) : (+v).toFixed(2));
+        const out = el('span', 'text-align:right;opacity:.9;font-size:10px;', fmt(val));
+        if (curve !== 1) {
+            const toPos = (v) => Math.pow(Math.max(0, (v - min) / (max - min)), 1 / curve);
+            const toVal = (p) => min + (max - min) * Math.pow(p, curve);
+            input.type = 'range'; input.min = 0; input.max = 1; input.step = 0.001; input.value = toPos(val);
+            input.addEventListener('input', () => { const v = toVal(+input.value); out.textContent = fmt(v); onInput(v); });
+        } else {
+            input.type = 'range'; input.min = min; input.max = max; input.step = step; input.value = val;
+            input.addEventListener('input', () => { out.textContent = fmt(+input.value); onInput(+input.value); });
+        }
         row.append(input, out);
         return row;
     }
@@ -112,7 +125,8 @@ export class RenderSettingsPanel {
         body.append(this._envStatus);
 
         body.append(this._slider('exposure', 0, 3, 0.05, this.s.exposure, (v) => { this.s.exposure = v; this._applyExposure(); this._save(); this.sm.render?.(); }));
-        body.append(this._slider('env IBL', 0, 3, 0.05, this.s.envIntensity, (v) => { this.s.envIntensity = v; this._applyEnv(); this._save(); this.sm.render?.(); }));
+        // Perceptual (cubic) curve so the low end (where the sweet spot sits) is finely adjustable.
+        body.append(this._slider('env IBL', 0, 3, 0.001, this.s.envIntensity, (v) => { this.s.envIntensity = v; this._applyEnv(); this._save(); this.sm.render?.(); }, 3));
         body.append(this._slider('key light', 0, 8, 0.1, this.s.keyLight, (v) => { this.s.keyLight = v; this._applyLights(); this._save(); this.sm.render?.(); }));
         body.append(this._slider('ambient', 0, 3, 0.05, this.s.ambient, (v) => { this.s.ambient = v; this._applyLights(); this._save(); this.sm.render?.(); }));
 

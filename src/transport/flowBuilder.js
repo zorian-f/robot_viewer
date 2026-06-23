@@ -50,12 +50,32 @@ function makeJointNode(id, label, repAngles, movements, velocity, acceleration, 
     };
 }
 
-const edge = (src, tgt) => ({
-    id: `vueflow__edge-${src}out-${tgt}in`,
+const edge = (src, tgt, handle = 'out') => ({
+    id: `vueflow__edge-${src}${handle}-${tgt}in`,
     source: src,
-    sourceHandle: 'out',
+    sourceHandle: handle,
     target: tgt,
 });
+
+/** Infinite loop entry node — its "loop" handle runs the body each iteration, forever. */
+function loopNode(id, x) {
+    return {
+        id,
+        type: 'loop',
+        parentNode: null,
+        data: {
+            name: '',
+            valid: true,
+            infinite: true,
+            canBeSaved: true,
+            iterations: { dtype: 'integer', expressionRaw: '1', expressionProcessed: '1' },
+        },
+        position: { x, y: 0 },
+    };
+}
+
+// Stamped on every variable we create so they're trivial to find & bulk-clean in RobFlow.
+const ORRERIUM_TAG = { name: 'orrerium', color: '#8ACED8' };
 
 // ---- Variable-bound waypoint flow (Phase 4) --------------------------------
 // RobFlow variable types: jointPose (jointAngles[] deg) / cartesianPose (position xyz mm +
@@ -85,7 +105,7 @@ export function poseValue(mode, it) {
 function poseVariable(mode, name, varUuid, it) {
     const common = {
         conflictAction: null, name, description: '', uuid: varUuid,
-        persistent: true, readonly: false, tags: [], syncToStudio: false,
+        persistent: true, readonly: false, tags: [{ ...ORRERIUM_TAG }], syncToStudio: false,
         version: 'v7.1.7', problematic: false, protocolConfigs: protocolConfigs(),
     };
     const v = poseValue(mode, it);
@@ -143,8 +163,14 @@ export function buildWaypointFlow(name, groups, opts = {}) {
         data: { valid: true, validStates: { general: true } }, position: { x: 0, y: 0 },
     }];
     const edges = [];
-    let prev = 'start';
-    let x = 380;
+    // Wrap the whole sequence in an infinite loop: start → loop, and the loop's "loop" (body)
+    // handle drives the movement chain. No stop node — when the body chain ends, the loop just
+    // repeats it forever.
+    nodes.push(loopNode('loop', 380));
+    edges.push(edge('start', 'loop'));
+    let prev = 'loop';
+    let prevHandle = 'loop'; // first body edge leaves the loop via its "loop" (body) handle
+    let x = 760;
     let gIdx = 0;
     let wIdx = 0;
 
@@ -162,17 +188,13 @@ export function buildWaypointFlow(name, groups, opts = {}) {
         const id = `move-${gIdx}`;
         const label = grp.label || (grp.items.length > 1 ? `Group ${gIdx + 1}` : grp.items[0]?.name || `Move ${gIdx + 1}`);
         nodes.push(moveNode(mode, id, label, movements, x));
-        edges.push(edge(prev, id));
+        edges.push(edge(prev, id, prevHandle));
         prev = id;
+        prevHandle = 'out';
         x += 380;
         gIdx += 1;
     }
-
-    nodes.push({
-        id: 'stop', type: 'stop', parentNode: null,
-        data: { valid: true, validStates: { general: true } }, position: { x, y: 0 },
-    });
-    edges.push(edge(prev, 'stop'));
+    // No stop / afterCompletion edge: the infinite loop re-runs the body chain.
 
     const flow = {
         name,

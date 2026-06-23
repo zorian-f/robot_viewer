@@ -15,15 +15,14 @@ const TONE = {
     Reinhard: THREE.ReinhardToneMapping,
     Cineon: THREE.CineonToneMapping,
 };
-const KEY = 'robco-render-settings-v5'; // bumped for PBR materials + AO/bloom controls
-// Filmic (ACES) tone mapping at exposure 1.0, lit primarily by the studio IBL. Key/ambient
-// lights and shadows are off by default (the environment does the work); enable them here or
-// in the panel. PBR material defaults + post-processing (ambient occlusion / bloom) are
-// tunable below.
+const KEY = 'robco-render-settings-v6'; // bumped to ship the tuned default look
+// Tuned default look: filmic (ACES) tone mapping at exposure 1.0, lit by a strong key light
+// (3.0) + ambient (1.2) with a low studio-IBL contribution (0.15); shadows, ambient occlusion
+// and bloom are off by default. PBR metalness/roughness ~0.43. Everything is tunable in panel.
 const DEFAULTS = {
-    exposure: 1.0, envIntensity: 1.0, tone: 'ACES', keyLight: 0.0, ambient: 0.0, shadows: false,
+    exposure: 1.0, envIntensity: 0.15, tone: 'ACES', keyLight: 3.0, ambient: 1.2, shadows: false,
     background: '#FCF9F7',
-    ao: true, aoStrength: 1.0, bloom: true, bloomStrength: 0.25, metalness: 0.1, roughness: 0.55,
+    ao: false, aoStrength: 2.0, bloom: false, bloomStrength: 0.45, metalness: 0.43, roughness: 0.43,
 };
 
 const PANEL_CSS =

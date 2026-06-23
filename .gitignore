@@ -28,6 +28,9 @@ Thumbs.db
 # Cache
 .cache/
 
+# Firebase CLI deploy cache (keep firebase.json and .firebaserc tracked)
+.firebase/
+
 
 # RobCo's own studio HDRI (proprietary) — loaded locally for the exact look, never committed.
 # Drop your extracted studio.exr at public/env/ to auto-use it; falls back to the procedural env.

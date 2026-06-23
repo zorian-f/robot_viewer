@@ -9,6 +9,7 @@ import { ConstraintManager } from './ConstraintManager.js';
 import { CoordinateAxesManager } from './CoordinateAxesManager.js';
 import { HighlightManager } from './HighlightManager.js';
 import { MeasurementManager } from './MeasurementManager.js';
+import { PostFXManager } from './PostFXManager.js';
 
 /**
  * SceneManager - Core scene management and coordination
@@ -46,7 +47,16 @@ export class SceneManager {
             antialias: true
         });
         this.renderer.setSize(width, height);
-        this.renderer.setPixelRatio(window.devicePixelRatio);
+        // Cap pixel ratio at 2: hi-DPI screens otherwise render 3–4× the pixels for no
+        // visible gain. SMAA (post-processing) handles edge anti-aliasing.
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+        // Colour management + tone mapping (global default; the Render panel can override).
+        // With the post-processing composer this is applied by OutputPass; without it the
+        // renderer applies it directly. Either way the pipeline is filmic + sRGB.
+        this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+        this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        this.renderer.toneMappingExposure = 1.0;
 
         // Enable shadows
         this.renderer.shadowMap.enabled = true;
@@ -118,6 +128,11 @@ export class SceneManager {
         this.highlightManager = new HighlightManager(this);
         this.measurementManager = new MeasurementManager(this);
 
+        // Optional post-processing (ambient occlusion / bloom / SMAA). Lazy-loaded; until it
+        // is ready (or if it fails) rendering falls back to a plain renderer.render().
+        this.postFX = new PostFXManager(this);
+        this.postFX.init();
+
         // Current model
         this.currentModel = null;
         this.ignoreLimits = false;
@@ -149,7 +164,7 @@ export class SceneManager {
                 || this._pointerActive
                 || (performance.now() - this._lastInputAt) < this._INPUT_SETTLE_MS;
             if (active) {
-                this.renderer.render(this.scene, this.camera);
+                this._renderFrame();
                 this._dirty = false;
             }
             this._renderLoopId = requestAnimationFrame(renderLoop);
@@ -203,8 +218,17 @@ export class SceneManager {
             return;
         }
         // Render immediately (for scenes requiring immediate update)
-        this.renderer.render(this.scene, this.camera);
+        this._renderFrame();
         this._dirty = false;
+    }
+
+    /**
+     * Render one frame through the post-processing composer when it's ready, otherwise fall
+     * back to a plain renderer.render(). Single choke point for all rendering.
+     */
+    _renderFrame() {
+        if (this.postFX && this.postFX.render()) return;
+        this.renderer.render(this.scene, this.camera);
     }
 
     // ==================== Model Management ====================
@@ -1013,7 +1037,8 @@ export class SceneManager {
 
         // Update renderer size
         this.renderer.setSize(width, height, true);
-        this.renderer.setPixelRatio(window.devicePixelRatio);
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        this.postFX?.setSize(width, height);
 
         // Render immediately
         this.render();
@@ -1035,7 +1060,8 @@ export class SceneManager {
 
         // Update renderer size (updateStyle set to true to update canvas style)
         this.renderer.setSize(width, height, true);
-        this.renderer.setPixelRatio(window.devicePixelRatio);
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        this.postFX?.setSize(width, height);
 
         // Render immediately to avoid black areas
         this.render();

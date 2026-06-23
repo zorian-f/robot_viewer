@@ -48,24 +48,23 @@ export class VisualizationManager {
                         return;
                     }
 
-                    // Convert MeshBasicMaterial or MeshLambertMaterial to MeshPhongMaterial
+                    // Convert legacy non-PBR materials to MeshStandardMaterial (PBR) so they
+                    // respond to the studio IBL. Reflections come from scene.environment.
                     if (material.type === 'MeshBasicMaterial' || material.type === 'MeshLambertMaterial') {
                         const oldMaterial = material;
-                        const enhancedLighting = this.showEnhancedLighting;
-                        const envMap = this.sceneManager.environmentManager?.getEnvironmentMap();
-                        const newMaterial = new THREE.MeshPhongMaterial({
-                            color: oldMaterial.color,
-                            map: oldMaterial.map,
+                        const newMaterial = new THREE.MeshStandardMaterial({
+                            color: oldMaterial.color ? oldMaterial.color.clone() : new THREE.Color(0xffffff),
+                            map: oldMaterial.map || null,
                             transparent: oldMaterial.transparent,
                             opacity: oldMaterial.opacity,
                             side: oldMaterial.side,
-                            shininess: enhancedLighting ? 50 : 30,
-                            specular: enhancedLighting ? new THREE.Color(0.3, 0.3, 0.3) : new THREE.Color(0x111111),
-                            envMap: envMap || null,
-                            reflectivity: envMap ? 0.3 : 0
+                            metalness: 0.1,
+                            roughness: 0.55,
+                            envMapIntensity: 1.0,
                         });
                         newMaterial.userData.originalShininess = 30;
                         newMaterial.userData.originalSpecular = null;
+                        newMaterial.userData.pbrConverted = true;
                         if (newMaterial.map) {
                             newMaterial.map.colorSpace = THREE.SRGBColorSpace;
                         }
@@ -227,24 +226,23 @@ export class VisualizationManager {
                         return;
                     }
 
-                    // Convert MeshBasicMaterial or MeshLambertMaterial to MeshPhongMaterial
+                    // Convert legacy non-PBR materials to MeshStandardMaterial (PBR) so they
+                    // respond to the studio IBL. Reflections come from scene.environment.
                     if (material.type === 'MeshBasicMaterial' || material.type === 'MeshLambertMaterial') {
                         const oldMaterial = material;
-                        const enhancedLighting = this.showEnhancedLighting;
-                        const envMap = this.sceneManager.environmentManager?.getEnvironmentMap();
-                        const newMaterial = new THREE.MeshPhongMaterial({
-                            color: oldMaterial.color,
-                            map: oldMaterial.map,
+                        const newMaterial = new THREE.MeshStandardMaterial({
+                            color: oldMaterial.color ? oldMaterial.color.clone() : new THREE.Color(0xffffff),
+                            map: oldMaterial.map || null,
                             transparent: oldMaterial.transparent,
                             opacity: oldMaterial.opacity,
                             side: oldMaterial.side,
-                            shininess: enhancedLighting ? 50 : 30,
-                            specular: enhancedLighting ? new THREE.Color(0.3, 0.3, 0.3) : new THREE.Color(0x111111),
-                            envMap: envMap || null,
-                            reflectivity: envMap ? 0.3 : 0
+                            metalness: 0.1,
+                            roughness: 0.55,
+                            envMapIntensity: 1.0,
                         });
                         newMaterial.userData.originalShininess = 30;
                         newMaterial.userData.originalSpecular = null;
+                        newMaterial.userData.pbrConverted = true;
                         if (newMaterial.map) {
                             newMaterial.map.colorSpace = THREE.SRGBColorSpace;
                         }
@@ -558,6 +556,7 @@ export class VisualizationManager {
                         });
                         newMaterial.userData.originalShininess = 30;
                         newMaterial.userData.originalSpecular = null;
+                        newMaterial.userData.pbrConverted = true;
                         if (newMaterial.map) {
                             newMaterial.map.colorSpace = THREE.SRGBColorSpace;
                         }

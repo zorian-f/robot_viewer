@@ -15,11 +15,16 @@ const TONE = {
     Reinhard: THREE.ReinhardToneMapping,
     Cineon: THREE.CineonToneMapping,
 };
-const KEY = 'robco-render-settings-v4'; // bumped to adopt the RobCo-matched recipe
-// Matches RobCo Studio's visualizer (reverse-engineered from its bundle): ACES Filmic at
-// exposure 1.0, lit purely by the bright studio environment (no key light / shadows), warm
-// off-white background. Re-enable key/ambient/shadows here if you want our extra shading.
-const DEFAULTS = { exposure: 1.0, envIntensity: 1.0, tone: 'ACES', keyLight: 0.0, ambient: 0.0, shadows: false, background: '#FCF9F7' };
+const KEY = 'robco-render-settings-v5'; // bumped for PBR materials + AO/bloom controls
+// Filmic (ACES) tone mapping at exposure 1.0, lit primarily by the studio IBL. Key/ambient
+// lights and shadows are off by default (the environment does the work); enable them here or
+// in the panel. PBR material defaults + post-processing (ambient occlusion / bloom) are
+// tunable below.
+const DEFAULTS = {
+    exposure: 1.0, envIntensity: 1.0, tone: 'ACES', keyLight: 0.0, ambient: 0.0, shadows: false,
+    background: '#FCF9F7',
+    ao: true, aoStrength: 1.0, bloom: true, bloomStrength: 0.25, metalness: 0.1, roughness: 0.55,
+};
 
 const PANEL_CSS =
     'position:fixed;right:16px;bottom:16px;z-index:3000;width:240px;font:12px/1.4 ui-monospace,Menlo,Consolas,monospace;' +
@@ -136,6 +141,26 @@ export class RenderSettingsPanel {
         shRow.append(sh, el('span', 'opacity:.85;', 'shadows'));
         body.append(shRow);
 
+        // --- Post-processing: ambient occlusion ---
+        const aoRow = el('label', 'display:flex;align-items:center;gap:8px;margin-top:6px;cursor:pointer;');
+        const ao = el('input'); ao.type = 'checkbox'; ao.checked = this.s.ao; ao.style.cssText = 'accent-color:#3fb950;';
+        ao.addEventListener('change', () => { this.s.ao = ao.checked; this._applyAO(); this._save(); this.sm.render?.(); });
+        aoRow.append(ao, el('span', 'opacity:.85;', 'ambient occlusion'));
+        body.append(aoRow);
+        body.append(this._slider('AO amt', 0, 2, 0.05, this.s.aoStrength, (v) => { this.s.aoStrength = v; this._applyAO(); this._save(); this.sm.render?.(); }));
+
+        // --- Post-processing: bloom ---
+        const blRow = el('label', 'display:flex;align-items:center;gap:8px;margin-top:6px;cursor:pointer;');
+        const bl = el('input'); bl.type = 'checkbox'; bl.checked = this.s.bloom; bl.style.cssText = 'accent-color:#3fb950;';
+        bl.addEventListener('change', () => { this.s.bloom = bl.checked; this._applyBloom(); this._save(); this.sm.render?.(); });
+        blRow.append(bl, el('span', 'opacity:.85;', 'bloom'));
+        body.append(blRow);
+        body.append(this._slider('bloom', 0, 1, 0.01, this.s.bloomStrength, (v) => { this.s.bloomStrength = v; this._applyBloom(); this._save(); this.sm.render?.(); }));
+
+        // --- PBR material defaults (only affects converted URDF/STL meshes, not authored glTF) ---
+        body.append(this._slider('metalness', 0, 1, 0.01, this.s.metalness, (v) => { this.s.metalness = v; this._applyMaterials(); this._save(); this.sm.render?.(); }));
+        body.append(this._slider('roughness', 0, 1, 0.01, this.s.roughness, (v) => { this.s.roughness = v; this._applyMaterials(); this._save(); this.sm.render?.(); }));
+
         minBtn.addEventListener('click', () => {
             const hidden = body.style.display === 'none';
             body.style.display = hidden ? 'block' : 'none';
@@ -219,6 +244,24 @@ export class RenderSettingsPanel {
         this.sm.scene.traverse((o) => { if (o.isMesh) { o.castShadow = this.s.shadows; o.receiveShadow = this.s.shadows; } });
     }
 
+    _applyAO() { this.sm.postFX?.setAO(this.s.ao, this.s.aoStrength); }
+    _applyBloom() { this.sm.postFX?.setBloom(this.s.bloom, this.s.bloomStrength); }
+    /** Re-apply AO + bloom (called once the lazily-loaded post-processing composer is ready). */
+    applyPostFX() { this._applyAO(); this._applyBloom(); }
+    /** Apply global metalness/roughness to converted (non-authored) PBR materials only. */
+    _applyMaterials() {
+        this.sm.scene.traverse((o) => {
+            if (!o.isMesh) return;
+            for (const m of (Array.isArray(o.material) ? o.material : [o.material])) {
+                if (m && m.isMeshStandardMaterial && m.userData?.pbrConverted) {
+                    m.metalness = this.s.metalness;
+                    m.roughness = this.s.roughness;
+                    m.needsUpdate = true;
+                }
+            }
+        });
+    }
+
     /** Apply all current settings (call after a model (re)loads). */
     applyAll() {
         this._applyBackground();
@@ -227,6 +270,9 @@ export class RenderSettingsPanel {
         this._applyEnv();
         this._applyLights();
         this._applyShadows();
+        this._applyMaterials();
+        this._applyAO();
+        this._applyBloom();
         this.sm.render?.();
     }
 }

@@ -70,6 +70,17 @@ function protocolConfigs() {
     };
 }
 
+/**
+ * The pose value stored in a jointPose / cartesianPose variable (and patched on override).
+ * cartesian: position xyz mm + orientation rx,ry,rz EULER deg. joint: jointAngles[] deg.
+ * @returns {object} a fresh value object (never mutates `it`).
+ */
+export function poseValue(mode, it) {
+    return mode === 'cartesian'
+        ? { poseVariableId: null, position: it.position, orientation: it.orientation }
+        : { poseVariableId: null, jointAngles: it.joints };
+}
+
 /** EximJointPoseVariable / EximCartesianPoseVariable for a waypoint. */
 function poseVariable(mode, name, varUuid, it) {
     const common = {
@@ -77,12 +88,9 @@ function poseVariable(mode, name, varUuid, it) {
         persistent: true, readonly: false, tags: [], syncToStudio: false,
         version: 'v7.1.7', problematic: false, protocolConfigs: protocolConfigs(),
     };
-    if (mode === 'cartesian') {
-        const v = { poseVariableId: null, position: it.position, orientation: it.orientation };
-        return { ...common, dtype: 'cartesianPose', initialValue: v, currentValue: { ...v } };
-    }
-    const v = { poseVariableId: null, jointAngles: it.joints };
-    return { ...common, dtype: 'jointPose', initialValue: v, currentValue: { ...v } };
+    const v = poseValue(mode, it);
+    const dtype = mode === 'cartesian' ? 'cartesianPose' : 'jointPose';
+    return { ...common, dtype, initialValue: v, currentValue: { ...v } };
 }
 
 /** One movement inside a movement node, bound to its pose variable. */
@@ -112,20 +120,24 @@ const sanitize = (s) => String(s || '').replace(/[^A-Za-z0-9]+/g, '_').replace(/
 /**
  * Build an importable EximFlow from grouped waypoints, each movement bound to a pose variable.
  * @param {string} name
- * @param {{label?:string, items:{name?:string, joints?:number[], position?:number[], orientation?:number[]}[]}[]} groups
+ * @param {{label?:string, items:{id?:string, name?:string, joints?:number[], position?:number[], orientation?:number[]}[]}[]} groups
  *        groups[].items each carry joints (deg) for joint mode and/or position(mm)+orientation(deg) for cartesian.
- * @param {{mode?:'joint'|'cartesian', velocity?:number, acceleration?:number}} [opts]
- * @returns {{flow:object, variableUuids:string[]}} flow (POST /flows/import) + the per-waypoint variable uuids.
+ * @param {{mode?:'joint'|'cartesian', velocity?:number, acceleration?:number,
+ *          flowUuid?:string, varUuidFor?:(key:string)=>string|undefined}} [opts]
+ *        flowUuid / varUuidFor let the caller reuse stable ids across re-pushes (override support).
+ * @returns {{flow:object, variableUuids:string[], varByKey:Record<string,string>}}
+ *          flow (POST /flows/import), the per-waypoint variable uuids, and a waypoint-key → uuid map.
  */
 export function buildWaypointFlow(name, groups, opts = {}) {
     const mode = opts.mode === 'cartesian' ? 'cartesian' : 'joint';
     const velocity = opts.velocity ?? 0.1;
     const acceleration = opts.acceleration ?? 0.1;
-    const flowUuid = uuid();
+    const flowUuid = opts.flowUuid || uuid();
     const short = flowUuid.slice(0, 8);
 
     const variables = [];
     const variableUuids = [];
+    const varByKey = {};
     const nodes = [{
         id: 'start', type: 'start', parentNode: null,
         data: { valid: true, validStates: { general: true } }, position: { x: 0, y: 0 },
@@ -138,10 +150,12 @@ export function buildWaypointFlow(name, groups, opts = {}) {
 
     for (const grp of groups) {
         const movements = grp.items.map((it) => {
-            const varUuid = uuid();
+            const key = it.id != null ? String(it.id) : `${wIdx}`;
+            const varUuid = opts.varUuidFor?.(key) || uuid();
             const varName = `wp_${short}_${wIdx}_${sanitize(it.name)}`;
             variables.push(poseVariable(mode, varName, varUuid, it));
             variableUuids.push(varUuid);
+            varByKey[key] = varUuid;
             wIdx += 1;
             return poseMovement(mode, it, varUuid, velocity, acceleration);
         });
@@ -187,7 +201,7 @@ export function buildWaypointFlow(name, groups, opts = {}) {
         conflictAction: null,
         csvConfigs: [],
     };
-    return { flow, variableUuids };
+    return { flow, variableUuids, varByKey };
 }
 
 /**

@@ -37,17 +37,19 @@ export class WaypointsPanel {
         return p;
     }
 
-    constructor({ app, teach, base, store, client }) {
+    constructor({ app, teach, base, store, client, cycleTimer }) {
         this.app = app;
         this.teach = teach;
         this.base = base;
         this.store = store;
         this.client = client || null;
+        this.cycleTimer = cycleTimer || null;
         this._selected = new Set();
         // Per-flow-name push registry: name → {flowUuid, name, mode, signature, varByKey}.
         // Lets a re-push reuse the same variables (override) or clean them up (rebuild).
         this._pushReg = new Map();
         this._build();
+        this._bindCycleTimer();
 
         // Re-render on store changes; recompute reachability when the base moves.
         this.store.onChange = () => this._renderList();
@@ -55,12 +57,28 @@ export class WaypointsPanel {
         this.store.refreshReachability(this.teach);
     }
 
-    update({ teach, base, store, client }) {
+    update({ teach, base, store, client, cycleTimer }) {
         if (teach) this.teach = teach;
         if (base) { this.base = base; this.base.onChange = () => { this.store.refreshReachability(this.teach); this._renderList(); }; }
         if (store) { this.store = store; this.store.onChange = () => this._renderList(); }
         if (client !== undefined) this.client = client;
+        if (cycleTimer) { this.cycleTimer = cycleTimer; this._bindCycleTimer(); }
         this._renderList();
+    }
+
+    /** Route the cycle meter's updates to the readout and show its current value. */
+    _bindCycleTimer() {
+        if (!this.cycleTimer) return;
+        this.cycleTimer.onUpdate = (stats) => this._renderCycle(stats);
+        this._renderCycle(this.cycleTimer.stats());
+    }
+
+    _renderCycle(stats) {
+        if (!this._cycleLine) return;
+        if (!stats || stats.lastMs == null) { this._cycleLine.textContent = 'Cycle: —'; return; }
+        const s = (ms) => `${(ms / 1000).toFixed(2)} s`;
+        const avg = stats.avgMs != null ? ` · avg ${s(stats.avgMs)}` : '';
+        this._cycleLine.textContent = `Cycle: ${s(stats.lastMs)}${avg} · n=${stats.count}`;
     }
 
     _build() {
@@ -238,6 +256,10 @@ export class WaypointsPanel {
         btnRow.append(this._pushBtn, this._runBtn, this._runOnlyBtn);
         wrap.append(btnRow);
 
+        // Measured loop cycle time (fed by the messageLog marker over the WS message stream).
+        this._cycleLine = el('div', 'font-size:11px;color:#9da7b3;margin-top:6px;min-height:14px;', 'Cycle: —');
+        wrap.append(this._cycleLine);
+
         if (!this.client) wrap.append(el('div', 'font-size:10px;color:#6e7681;margin-top:3px;', 'connect a session to push'));
         return wrap;
     }
@@ -336,6 +358,7 @@ export class WaypointsPanel {
         this._lastPush = { flowUuid: reg.flowUuid, name: reg.name, variableUuids: Object.values(reg.varByKey), mode };
         if (run) {
             await this.client.setDesiredRobotState(2).catch(() => {});
+            this.cycleTimer?.reset(); // fresh run → start measuring cycles from scratch
             await this.client.runFlow(reg.flowUuid);
             this._status.textContent = `override + run "${reg.name}" — updated ${n} waypoint value(s)`;
         } else {
@@ -362,6 +385,7 @@ export class WaypointsPanel {
         this._lastPush = { flowUuid: uuid, name: flow.name, variableUuids, mode: opts.mode };
         if (run) {
             await this.client.setDesiredRobotState(2).catch(() => {}); // ensure operational
+            this.cycleTimer?.reset(); // fresh run → start measuring cycles from scratch
             await this.client.runFlow(uuid);
             this._status.textContent = `running "${flow.name}" (${variableUuids.length} waypoints)`;
         } else {
@@ -378,6 +402,7 @@ export class WaypointsPanel {
         this._status.textContent = `running "${last.name || 'flow'}"…`;
         try {
             await this.client.setDesiredRobotState(2).catch(() => {}); // ensure operational
+            this.cycleTimer?.reset(); // fresh run → start measuring cycles from scratch
             await this.client.runFlow(last.flowUuid);
             this._status.textContent = `running "${last.name || 'flow'}"`;
         } catch (e) {

@@ -77,6 +77,28 @@ function loopNode(id, x) {
 // Stamped on every variable we create so they're trivial to find & bulk-clean in RobFlow.
 const ORRERIUM_TAG = { name: 'orrerium', color: '#8ACED8' };
 
+// Logged once per loop iteration via a messageLog node at the end of the body. The cycle-time
+// reader (CycleTimer) matches message-log entries on this exact text to time the full loop.
+export const CYCLE_MARKER = 'orrerium-cycle';
+
+/** messageLog node — fires each loop pass; its log entry (server-timestamped) marks a cycle. */
+function messageLogNode(id, x) {
+    return {
+        id,
+        type: 'messageLog',
+        parentNode: null,
+        data: {
+            name: '',
+            valid: true,
+            // StringExpression is a literal template — plain text, no quoting needed.
+            message: { dtype: 'string', expressionRaw: CYCLE_MARKER, expressionProcessed: CYCLE_MARKER },
+            logLevel: 'info',
+            canBeSaved: true,
+        },
+        position: { x, y: 0 },
+    };
+}
+
 // ---- Variable-bound waypoint flow (Phase 4) --------------------------------
 // RobFlow variable types: jointPose (jointAngles[] deg) / cartesianPose (position xyz mm +
 // orientation rx,ry,rz EULER deg). One variable per waypoint (no array type). A movement binds
@@ -194,7 +216,10 @@ export function buildWaypointFlow(name, groups, opts = {}) {
         x += 380;
         gIdx += 1;
     }
-    // No stop / afterCompletion edge: the infinite loop re-runs the body chain.
+    // Cycle marker: log once at the very end of the body so each loop pass emits a timestamped
+    // entry. It's the terminal node — no outgoing edge — and the infinite loop repeats the chain.
+    nodes.push(messageLogNode('cycle-log', x));
+    edges.push(edge(prev, 'cycle-log', prevHandle));
 
     const flow = {
         name,

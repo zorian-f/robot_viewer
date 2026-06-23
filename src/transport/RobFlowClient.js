@@ -49,6 +49,27 @@ export class RobFlowClient {
         return data.access_token;
     }
 
+    /**
+     * Pull a human-readable detail out of an error response body. FastAPI returns a JSON
+     * `{detail: …}` (a string, or a 422 validation array pinpointing the bad field) — surfacing
+     * it turns an opaque "HTTP 422" into something diagnosable. Best-effort; never throws.
+     */
+    async _detail(res) {
+        try {
+            const txt = await res.text();
+            if (!txt) return '';
+            try {
+                const j = JSON.parse(txt);
+                if (j && j.detail != null) {
+                    return ` — ${typeof j.detail === 'string' ? j.detail : JSON.stringify(j.detail)}`;
+                }
+            } catch { /* body wasn't JSON */ }
+            return ` — ${txt.slice(0, 400)}`;
+        } catch {
+            return '';
+        }
+    }
+
     async _put(path, body) {
         const res = await fetch(`${this.restBase}${path}`, {
             method: 'PUT',
@@ -59,10 +80,10 @@ export class RobFlowClient {
             body: body !== undefined ? JSON.stringify(body) : undefined,
         });
         if (!res.ok) {
-            const detail = res.status === 401 || res.status === 403
+            const hint = res.status === 401 || res.status === 403
                 ? ' (missing/expired token, or robot not in TEACH mode)'
                 : '';
-            throw new Error(`PUT ${path} → HTTP ${res.status}${detail}`);
+            throw new Error(`PUT ${path} → HTTP ${res.status}${hint}${await this._detail(res)}`);
         }
         return res.status;
     }
@@ -72,7 +93,7 @@ export class RobFlowClient {
             headers: this._headers(),
             credentials: 'omit',
         });
-        if (!res.ok) throw new Error(`GET ${path} → HTTP ${res.status}`);
+        if (!res.ok) throw new Error(`GET ${path} → HTTP ${res.status}${await this._detail(res)}`);
         return res.json();
     }
 
@@ -127,7 +148,7 @@ export class RobFlowClient {
             credentials: 'omit',
             body: JSON.stringify(body),
         });
-        if (!res.ok) throw new Error(`POST ${path} → HTTP ${res.status}`);
+        if (!res.ok) throw new Error(`POST ${path} → HTTP ${res.status}${await this._detail(res)}`);
         return res.json();
     }
 
@@ -138,7 +159,7 @@ export class RobFlowClient {
             credentials: 'omit',
             body: body !== undefined ? JSON.stringify(body) : undefined,
         });
-        if (!res.ok) throw new Error(`PATCH ${path} → HTTP ${res.status}`);
+        if (!res.ok) throw new Error(`PATCH ${path} → HTTP ${res.status}${await this._detail(res)}`);
         return res.status === 204 ? null : res.json().catch(() => null);
     }
 
@@ -146,7 +167,7 @@ export class RobFlowClient {
         const res = await fetch(`${this.restBase}${path}`, {
             method: 'DELETE', headers: this._headers(), credentials: 'omit',
         });
-        if (!res.ok) throw new Error(`DELETE ${path} → HTTP ${res.status}`);
+        if (!res.ok) throw new Error(`DELETE ${path} → HTTP ${res.status}${await this._detail(res)}`);
         return res.status;
     }
 
@@ -179,7 +200,11 @@ export class RobFlowClient {
         return this._post('/variables', v);
     }
 
-    /** PATCH /variables/{uuid} — partial value update (e.g. {currentValue}) without re-import. */
+    /**
+     * PATCH /variables/{uuid} — partial value update (e.g. {currentValue}) without re-import.
+     * The body is a `dtype`-discriminated tagged union, so the patch MUST include the variable's
+     * `dtype` (e.g. {dtype:'jointPose', currentValue}); omitting it → 422 (errorCode 250).
+     */
     updateVariable(uuid, patch) {
         return this._patch(`/variables/${uuid}`, patch);
     }

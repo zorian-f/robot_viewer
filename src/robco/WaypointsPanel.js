@@ -290,9 +290,19 @@ export class WaypointsPanel {
 
         this._pushBtn.disabled = this._runBtn.disabled = this._runOnlyBtn.disabled = true;
         try {
+            let overrode = false;
             if (canOverride) {
-                await this._override(reg, groups, mode, run);
-            } else {
+                try {
+                    await this._override(reg, groups, mode, run);
+                    overrode = true;
+                } catch (e) {
+                    // Override is the fast path; if the backend rejects it, fall back to a full
+                    // rebuild (which also cleans up the old variables) so a push is never stuck.
+                    console.warn('[RobCo] variable override failed — rebuilding:', e);
+                    this._status.textContent = `override failed, rebuilding… (${e.message})`;
+                }
+            }
+            if (!overrode) {
                 await this._rebuild(reg, name, groups, { mode, velocity, acceleration }, signature, run);
             }
         } catch (e) {
@@ -312,11 +322,14 @@ export class WaypointsPanel {
      * on the live robot; if a re-run ignores the override, press Push to force a rebuild).
      */
     async _override(reg, groups, mode, run) {
+        // `dtype` is the discriminator the PATCH /variables tagged-union needs to pick the right
+        // partial model — without it the backend rejects the body (422, errorCode 250).
+        const dtype = mode === 'cartesian' ? 'cartesianPose' : 'jointPose';
         let n = 0;
         for (const g of groups) {
             for (const it of g.items) {
                 const v = poseValue(mode, it);
-                await this.client.updateVariable(reg.varByKey[String(it.id)], { currentValue: v, initialValue: v });
+                await this.client.updateVariable(reg.varByKey[String(it.id)], { dtype, currentValue: v, initialValue: v });
                 n += 1;
             }
         }

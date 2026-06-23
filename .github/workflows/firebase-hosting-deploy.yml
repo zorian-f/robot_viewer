@@ -1,11 +1,12 @@
 name: Deploy to Firebase Hosting
 
-# Builds the Vite app and deploys it to the Firebase Hosting "live" channel
-# (https://orrerium.web.app) on every push to main. Manual runs via the
-# "Run workflow" button are also supported.
+# Builds the Vite app and deploys it to Firebase Hosting on every push:
+#   - main    -> production "live" channel   (https://orrerium.web.app)
+#   - develop -> stable preview channel       (https://orrerium--develop-<hash>.web.app)
+# Manual runs via the "Run workflow" button are also supported.
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
   workflow_dispatch:
 
 permissions:
@@ -42,10 +43,14 @@ jobs:
       - name: Build
         run: pnpm run build
 
-      - name: Deploy to Firebase Hosting (live channel)
+      # main -> production ("live"); any other branch (e.g. develop) -> a stable
+      # preview channel named after the branch. Preview channels keep the same
+      # URL across redeploys; expiry is reset to 30d on each push.
+      - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_ORRERIUM }}
           projectId: orrerium
-          channelId: live
+          channelId: ${{ github.ref_name == 'main' && 'live' || github.ref_name }}
+          expires: 30d

@@ -357,9 +357,7 @@ export class WaypointsPanel {
         }
         this._lastPush = { flowUuid: reg.flowUuid, name: reg.name, variableUuids: Object.values(reg.varByKey), mode };
         if (run) {
-            await this.client.setDesiredRobotState(2).catch(() => {});
-            this.cycleTimer?.reset(); // fresh run → start measuring cycles from scratch
-            await this.client.runFlow(reg.flowUuid);
+            await this._beginRun(reg.flowUuid);
             this._status.textContent = `override + run "${reg.name}" — updated ${n} waypoint value(s)`;
         } else {
             this._status.textContent = `override "${reg.name}" — updated ${n} value(s) in place (no re-import)`;
@@ -384,12 +382,30 @@ export class WaypointsPanel {
         this._pushReg.set(name, { flowUuid: uuid, name: flow.name, mode: opts.mode, signature, varByKey });
         this._lastPush = { flowUuid: uuid, name: flow.name, variableUuids, mode: opts.mode };
         if (run) {
-            await this.client.setDesiredRobotState(2).catch(() => {}); // ensure operational
-            this.cycleTimer?.reset(); // fresh run → start measuring cycles from scratch
-            await this.client.runFlow(uuid);
+            await this._beginRun(uuid);
             this._status.textContent = `running "${flow.name}" (${variableUuids.length} waypoints)`;
         } else {
             this._status.textContent = `pushed "${flow.name}" — ${groups.length} node(s), ${variableUuids.length} variables`;
+        }
+    }
+
+    /**
+     * Start (or restart) a run. Our flows loop forever, so a previous run is usually still
+     * active — issue PUT /stop first to clear FLOW_CONTINUOUS_RUNNING (otherwise /run → 409),
+     * re-assert operational, reset the cycle meter, then run. Retries once if the robot was
+     * still mid-stop when /run landed.
+     */
+    async _beginRun(uuid) {
+        await this.client.stop().catch(() => {});                  // clear any looping/paused flow
+        await this.client.setDesiredRobotState(2).catch(() => {}); // ensure operational
+        this.cycleTimer?.reset();                                  // fresh run → measure from scratch
+        try {
+            await this.client.runFlow(uuid);
+        } catch (e) {
+            if (!/\b409\b/.test(e.message)) throw e;
+            await new Promise((r) => setTimeout(r, 500));          // robot still stopping — let it settle
+            await this.client.setDesiredRobotState(2).catch(() => {});
+            await this.client.runFlow(uuid);
         }
     }
 
@@ -401,9 +417,7 @@ export class WaypointsPanel {
         this._runOnlyBtn.disabled = true;
         this._status.textContent = `running "${last.name || 'flow'}"…`;
         try {
-            await this.client.setDesiredRobotState(2).catch(() => {}); // ensure operational
-            this.cycleTimer?.reset(); // fresh run → start measuring cycles from scratch
-            await this.client.runFlow(last.flowUuid);
+            await this._beginRun(last.flowUuid);
             this._status.textContent = `running "${last.name || 'flow'}"`;
         } catch (e) {
             const hint = /\b40[13]\b/.test(e.message)

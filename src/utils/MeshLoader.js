@@ -204,6 +204,28 @@ export async function loadMeshFile(meshPath, fileMap) {
  * Ensure mesh uses lighting-compatible material
  * Enhanced for better lighting (MuJoCo style)
  */
+/**
+ * Set max anisotropic filtering on a material's textures (sharper at grazing angles), and
+ * keep colour maps sRGB while data maps (normal/roughness/metalness/ao) stay linear.
+ */
+function applyAnisotropy(material) {
+    let maxAniso = 4;
+    try {
+        const r = (typeof window !== 'undefined') && window.app?.sceneManager?.renderer;
+        maxAniso = r?.capabilities?.getMaxAnisotropy?.() || 4;
+    } catch { /* ignore */ }
+    for (const key of ['map', 'emissiveMap', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap']) {
+        const tex = material[key];
+        if (tex && tex.isTexture) {
+            tex.anisotropy = maxAniso;
+            tex.colorSpace = (key === 'map' || key === 'emissiveMap') ? THREE.SRGBColorSpace : THREE.LinearSRGBColorSpace;
+            tex.needsUpdate = true;
+        }
+    }
+}
+
+// NOTE: despite the historical name, this now produces physically-based MeshStandardMaterial
+// (not Phong) so meshes respond correctly to image-based lighting.
 export function ensureMeshHasPhongMaterial(meshObject) {
     meshObject.traverse((child) => {
         if (child.isMesh && child.material) {
@@ -213,28 +235,26 @@ export function ensureMeshHasPhongMaterial(meshObject) {
             materials.forEach((material, matIndex) => {
                 if (!material) return;
 
-                // Convert MeshBasicMaterial or MeshLambertMaterial to MeshPhongMaterial
+                // Convert legacy non-PBR materials (URDF/STL/OBJ/Collada arrive as Basic or
+                // Lambert) to MeshStandardMaterial so they respond to the studio IBL. Reflections
+                // come from scene.environment; metalness/roughness are tunable in the Render panel.
                 if (material.type === 'MeshBasicMaterial' || material.type === 'MeshLambertMaterial') {
                     const oldMaterial = material;
-                    const enhancedLighting = typeof window !== 'undefined' && window.app?.sceneManager?.visualizationManager?.showEnhancedLighting !== false;
-                    const envMap = typeof window !== 'undefined' && window.app?.sceneManager?.environmentManager?.getEnvironmentMap();
-                    const newMaterial = new THREE.MeshPhongMaterial({
-                        color: oldMaterial.color,
-                        map: oldMaterial.map,
+                    const newMaterial = new THREE.MeshStandardMaterial({
+                        color: oldMaterial.color ? oldMaterial.color.clone() : new THREE.Color(0xffffff),
+                        map: oldMaterial.map || null,
                         transparent: oldMaterial.transparent,
                         opacity: oldMaterial.opacity,
                         side: oldMaterial.side,
-                        shininess: enhancedLighting ? 50 : 30,
-                        specular: enhancedLighting ? new THREE.Color(0.3, 0.3, 0.3) : new THREE.Color(0x111111),
-                        envMap: envMap || null,
-                        reflectivity: envMap ? 0.3 : 0
+                        metalness: 0.1,
+                        roughness: 0.55,
+                        envMapIntensity: 1.0,
                     });
-                    // Save original properties for lighting toggle
                     newMaterial.userData.originalShininess = 30;
-                    newMaterial.userData.originalSpecular = null; // New material, no original specular
-                    if (newMaterial.map) {
-                        newMaterial.map.colorSpace = THREE.SRGBColorSpace;
-                    }
+                    newMaterial.userData.originalSpecular = null;
+                    newMaterial.userData.pbrConverted = true; // global metalness/roughness applies only to these
+                    if (newMaterial.map) newMaterial.map.colorSpace = THREE.SRGBColorSpace;
+                    applyAnisotropy(newMaterial);
                     materials[matIndex] = newMaterial;
                 } else if (material.isMeshPhongMaterial || material.isMeshStandardMaterial) {
                     // Save original properties before enhancing (for lighting toggle)
@@ -260,28 +280,13 @@ export function ensureMeshHasPhongMaterial(meshObject) {
                             material.userData.originalSpecular = null;
                         }
                     }
-                    // Apply environment map for reflections
-                    const envMap = typeof window !== 'undefined' && window.app?.sceneManager?.environmentManager?.getEnvironmentMap();
-                    if (envMap && !material.envMap) {
-                        material.envMap = envMap;
-                        if (material.reflectivity === undefined) {
-                            material.reflectivity = 0.3;
-                        }
-                        material.needsUpdate = true;
+                    // Existing material (e.g. glTF MeshStandardMaterial): reflections come from
+                    // scene.environment, so just ensure a sane env intensity + texture filtering.
+                    // (Phong shininess/specular are no longer used.)
+                    if ('envMapIntensity' in material && (material.envMapIntensity === undefined || material.envMapIntensity === 0)) {
+                        material.envMapIntensity = 1.0;
                     }
-                    // Enhance existing Phong/Standard materials - default enabled
-                    // Check current enhanced lighting state (if available)
-                    const enhancedLighting = typeof window !== 'undefined' && window.app?.sceneManager?.visualizationManager?.showEnhancedLighting !== false;
-                    if (enhancedLighting) {
-                        if (material.shininess === undefined || material.shininess < 50) {
-                            material.shininess = 50;
-                        }
-                        if (!material.specular ||
-                            (material.specular.isColor && material.specular.r < 0.2) ||
-                            (typeof material.specular === 'number' && material.specular < 0x333333)) {
-                            material.specular = new THREE.Color(0.3, 0.3, 0.3);
-                        }
-                    }
+                    applyAnisotropy(material);
                     material.needsUpdate = true;
                 }
             });

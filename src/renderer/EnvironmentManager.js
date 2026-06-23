@@ -3,6 +3,7 @@
  * Includes lighting, ground plane, coordinate system, etc.
  */
 import * as THREE from 'three';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 
 export class EnvironmentManager {
     constructor(scene) {
@@ -29,12 +30,13 @@ export class EnvironmentManager {
         this.lights.directional.position.set(4, 10, 1);
         this.lights.directional.castShadow = true;
 
-        // Optimize shadow quality
-        this.lights.directional.shadow.mapSize.width = 2048;
-        this.lights.directional.shadow.mapSize.height = 2048;
+        // Optimize shadow quality (4096 map for crisp contact shadows)
+        this.lights.directional.shadow.mapSize.width = 4096;
+        this.lights.directional.shadow.mapSize.height = 4096;
         this.lights.directional.shadow.camera.near = 0.1;
         this.lights.directional.shadow.camera.far = 50;
-        this.lights.directional.shadow.normalBias = 0.001;
+        this.lights.directional.shadow.normalBias = 0.02;
+        this.lights.directional.shadow.bias = -0.0001;
 
         // Set initial shadow camera range
         this.lights.directional.shadow.camera.left = -5;
@@ -68,16 +70,12 @@ export class EnvironmentManager {
                 this.pmremGenerator.compileEquirectangularShader();
             }
 
-            // Create a simple scene for environment map generation
-            const envScene = new THREE.Scene();
-
-            // Add hemisphere light to environment scene
-            const envLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.0);
-            envScene.add(envLight);
-
-            // Generate environment map
+            // Use RoomEnvironment for a soft, neutral studio IBL. This gives metals and
+            // glossy surfaces something believable to reflect instead of a flat grey field —
+            // a big step up from the previous single hemisphere light.
+            const envScene = new RoomEnvironment();
             this.envMap = this.pmremGenerator.fromScene(envScene, 0.04).texture;
-            this.envMap.mapping = THREE.EquirectangularReflectionMapping;
+            envScene.dispose?.();
 
             // Set environment map on scene
             this.scene.environment = this.envMap;

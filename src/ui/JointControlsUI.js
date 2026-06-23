@@ -177,7 +177,7 @@ export class JointControlsUI {
 
         let initialValue = joint.currentValue !== undefined ? joint.currentValue : (lower + upper) / 2;
         slider.value = initialValue;
-        slider.step = (upper - lower) / 1000;
+        slider.step = (upper - lower) / 10000;
 
         // Editable lower limit label
         const minLabel = document.createElement('input');
@@ -246,7 +246,7 @@ export class JointControlsUI {
             }
 
             slider.min = valueInRad;
-            slider.step = (slider.max - slider.min) / 1000;
+            slider.step = (slider.max - slider.min) / 10000;
 
             // Update limits in model
             if (joint.limits) {
@@ -294,7 +294,7 @@ export class JointControlsUI {
             }
 
             slider.max = valueInRad;
-            slider.step = (slider.max - slider.min) / 1000;
+            slider.step = (slider.max - slider.min) / 10000;
 
             // Update limits in model
             if (joint.limits) {
@@ -624,7 +624,7 @@ export class JointControlsUI {
                         slider.min = lower;
                         slider.max = upper;
                     }
-                    slider.step = (slider.max - slider.min) / 1000;
+                    slider.step = (slider.max - slider.min) / 10000;
                 }
 
                 const control = slider.closest('.joint-control');

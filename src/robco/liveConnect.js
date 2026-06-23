@@ -8,6 +8,8 @@ import { resolveSession } from '../transport/session.js';
 import { RobFlowSocket } from '../transport/RobFlowSocket.js';
 import { RobFlowClient } from '../transport/RobFlowClient.js';
 import { FrequencyMeter } from '../transport/FrequencyMeter.js';
+import { CycleTimer } from '../transport/CycleTimer.js';
+import { CYCLE_MARKER } from '../transport/flowBuilder.js';
 import { StreamRatePanel } from './StreamRatePanel.js';
 import { RobCoModuleAdapter } from '../adapters/RobCoModuleAdapter.js';
 import { applyAnglesDeg } from './poseUtils.js';
@@ -47,6 +49,11 @@ export async function connectLiveSession(app, opts) {
     socket.addTap((type, data, ts, recvNow) => meter.tick(type, data, ts, recvNow));
     StreamRatePanel.ensure(meter);
     app._robcoStreamMeter = meter;
+
+    // Cycle-time meter: the pushed loop logs CYCLE_MARKER once per pass; time the gaps.
+    const cycleTimer = new CycleTimer({ marker: CYCLE_MARKER });
+    socket.on('messages', (data) => cycleTimer.ingest(data, performance.now()));
+    app._robcoCycleTimer = cycleTimer;
     let model = null;
     let building = false;
     let latestAngles = null;
@@ -102,7 +109,7 @@ export async function connectLiveSession(app, opts) {
                     const { WaypointStore } = await import('./waypointStore.js');
                     const { WaypointsPanel } = await import('./WaypointsPanel.js');
                     const store = WaypointStore.ensure(app.sceneManager, window._robcoBaseFrame);
-                    WaypointsPanel.ensure({ app, teach, base: window._robcoBaseFrame, store, client });
+                    WaypointsPanel.ensure({ app, teach, base: window._robcoBaseFrame, store, client, cycleTimer });
                     const { EndEffector } = await import('./EndEffector.js');
                     EndEffector.ensure({ sm: app.sceneManager, model, teach, setupPanel: window._robcoSetupPanel });
                 }
@@ -123,6 +130,8 @@ export async function connectLiveSession(app, opts) {
         // While teaching, the dynamics panel follows the gizmo (updateStatic), not the stream.
         if (dynamics && !app._teachActive) dynamics.update(angles, performance.now());
         if (teach) teach.syncTcp();
+        // Streamed updates aren't user input, so request an on-demand frame to show them.
+        app.sceneManager?.redraw();
     });
 
     // RobFlow's own cartesian TCP pose — used verbatim for cartesian waypoint capture, since
@@ -133,6 +142,7 @@ export async function connectLiveSession(app, opts) {
         latestBaseShift = bs;
         // Single source of truth: the base shift moves the world (inverse), not the robot root.
         window._robcoBaseFrame?.setBaseShiftWS(bs);
+        app.sceneManager?.redraw();
     });
 
     socket.on('payload', (p) => {

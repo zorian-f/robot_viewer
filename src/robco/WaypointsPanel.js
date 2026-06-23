@@ -10,7 +10,7 @@
  * Draggable/minimizable, persisted position key `waypoints`.
  */
 import { makeDraggable } from './draggable.js';
-import { buildWaypointFlow } from '../transport/flowBuilder.js';
+import { buildWaypointFlow, poseValue } from '../transport/flowBuilder.js';
 
 const PANEL_CSS =
     'position:fixed;right:332px;top:330px;z-index:3000;width:300px;font:12px/1.4 ui-monospace,Menlo,Consolas,monospace;' +
@@ -37,14 +37,19 @@ export class WaypointsPanel {
         return p;
     }
 
-    constructor({ app, teach, base, store, client }) {
+    constructor({ app, teach, base, store, client, cycleTimer }) {
         this.app = app;
         this.teach = teach;
         this.base = base;
         this.store = store;
         this.client = client || null;
+        this.cycleTimer = cycleTimer || null;
         this._selected = new Set();
+        // Per-flow-name push registry: name → {flowUuid, name, mode, signature, varByKey}.
+        // Lets a re-push reuse the same variables (override) or clean them up (rebuild).
+        this._pushReg = new Map();
         this._build();
+        this._bindCycleTimer();
 
         // Re-render on store changes; recompute reachability when the base moves.
         this.store.onChange = () => this._renderList();
@@ -52,12 +57,28 @@ export class WaypointsPanel {
         this.store.refreshReachability(this.teach);
     }
 
-    update({ teach, base, store, client }) {
+    update({ teach, base, store, client, cycleTimer }) {
         if (teach) this.teach = teach;
         if (base) { this.base = base; this.base.onChange = () => { this.store.refreshReachability(this.teach); this._renderList(); }; }
         if (store) { this.store = store; this.store.onChange = () => this._renderList(); }
         if (client !== undefined) this.client = client;
+        if (cycleTimer) { this.cycleTimer = cycleTimer; this._bindCycleTimer(); }
         this._renderList();
+    }
+
+    /** Route the cycle meter's updates to the readout and show its current value. */
+    _bindCycleTimer() {
+        if (!this.cycleTimer) return;
+        this.cycleTimer.onUpdate = (stats) => this._renderCycle(stats);
+        this._renderCycle(this.cycleTimer.stats());
+    }
+
+    _renderCycle(stats) {
+        if (!this._cycleLine) return;
+        if (!stats || stats.lastMs == null) { this._cycleLine.textContent = 'Cycle: —'; return; }
+        const s = (ms) => `${(ms / 1000).toFixed(2)} s`;
+        const avg = stats.avgMs != null ? ` · avg ${s(stats.avgMs)}` : '';
+        this._cycleLine.textContent = `Cycle: ${s(stats.lastMs)}${avg} · n=${stats.count}`;
     }
 
     _build() {
@@ -229,8 +250,15 @@ export class WaypointsPanel {
         this._pushBtn.addEventListener('click', () => this._push(false));
         this._runBtn = el('button', BTN, 'Push & Run');
         this._runBtn.addEventListener('click', () => this._push(true));
-        btnRow.append(this._pushBtn, this._runBtn);
+        // Run the last-pushed flow again without re-importing (re-uses its variables).
+        this._runOnlyBtn = el('button', BTN + 'border-color:#3fb950;', 'Run');
+        this._runOnlyBtn.addEventListener('click', () => this._runLast());
+        btnRow.append(this._pushBtn, this._runBtn, this._runOnlyBtn);
         wrap.append(btnRow);
+
+        // Measured loop cycle time (fed by the messageLog marker over the WS message stream).
+        this._cycleLine = el('div', 'font-size:11px;color:#9da7b3;margin-top:6px;min-height:14px;', 'Cycle: —');
+        wrap.append(this._cycleLine);
 
         if (!this.client) wrap.append(el('div', 'font-size:10px;color:#6e7681;margin-top:3px;', 'connect a session to push'));
         return wrap;
@@ -243,7 +271,8 @@ export class WaypointsPanel {
         const velocity = Math.max(0, Math.min(1, +this._vel.value || 1));
         const acceleration = Math.max(0, Math.min(1, +this._acc.value || 1));
 
-        // Build per-group item data for the current base placement.
+        // Build per-group item data for the current base placement. Each item keeps its
+        // stable waypoint id so a re-push can target the same variables (override path).
         const groups = [];
         const unreachable = [];
         for (const g of this.store.grouped()) {
@@ -255,11 +284,11 @@ export class WaypointsPanel {
                     const c = it.robflowPose && it.robflowPose.position
                         ? it.robflowPose
                         : this.store.cartesianBaseFrame(it);
-                    items.push({ name: it.name, position: c.position, orientation: c.orientation });
+                    items.push({ id: it.id, name: it.name, position: c.position, orientation: c.orientation });
                 } else {
                     const s = this.teach.solveBaseMatrix(this.store.baseMatrix(it), it.joints);
                     if (!s.converged) { unreachable.push(it.name); continue; }
-                    items.push({ name: it.name, joints: s.deg.map((d) => Math.round(d * 1000) / 1000) });
+                    items.push({ id: it.id, name: it.name, joints: s.deg.map((d) => Math.round(d * 1000) / 1000) });
                 }
             }
             if (items.length) groups.push({ items });
@@ -269,19 +298,34 @@ export class WaypointsPanel {
             return;
         }
 
-        const { flow, variableUuids } = buildWaypointFlow(this._flowName.value || 'Viewer Flow', groups, { mode, velocity, acceleration });
-        this._lastPush = { flowUuid: flow.uuid, variableUuids, mode };
-        this._status.textContent = `pushing ${variableUuids.length} ${mode} waypoints…`;
-        this._pushBtn.disabled = this._runBtn.disabled = true;
+        const name = this._flowName.value || 'Viewer Flow';
+        // Structural signature = everything that lives in the flow's nodes rather than its
+        // pose variables: grouping/order of waypoint ids, mode, velocity, acceleration. If only
+        // the poses moved (same signature), we can override the variable values in place.
+        const signature = JSON.stringify({
+            mode, velocity, acceleration,
+            groups: groups.map((g) => g.items.map((i) => i.id)),
+        });
+        const reg = this._pushReg.get(name);
+        const canOverride = !!reg && reg.signature === signature
+            && groups.every((g) => g.items.every((i) => reg.varByKey[String(i.id)]));
+
+        this._pushBtn.disabled = this._runBtn.disabled = this._runOnlyBtn.disabled = true;
         try {
-            const created = await this.client.importFlow(flow);
-            const uuid = created?.uuid || flow.uuid;
-            if (run) {
-                await this.client.setDesiredRobotState(2).catch(() => {}); // ensure operational
-                await this.client.runFlow(uuid);
-                this._status.textContent = `running "${flow.name}" (${variableUuids.length} waypoints)`;
-            } else {
-                this._status.textContent = `pushed "${flow.name}" — ${groups.length} node(s), ${variableUuids.length} variables`;
+            let overrode = false;
+            if (canOverride) {
+                try {
+                    await this._override(reg, groups, mode, run);
+                    overrode = true;
+                } catch (e) {
+                    // Override is the fast path; if the backend rejects it, fall back to a full
+                    // rebuild (which also cleans up the old variables) so a push is never stuck.
+                    console.warn('[RobCo] variable override failed — rebuilding:', e);
+                    this._status.textContent = `override failed, rebuilding… (${e.message})`;
+                }
+            }
+            if (!overrode) {
+                await this._rebuild(reg, name, groups, { mode, velocity, acceleration }, signature, run);
             }
         } catch (e) {
             const hint = /\b40[13]\b/.test(e.message)
@@ -289,7 +333,85 @@ export class WaypointsPanel {
             this._status.textContent = `push failed: ${e.message}${hint}`;
             console.error('[RobCo] waypoint push failed:', e);
         } finally {
-            this._pushBtn.disabled = this._runBtn.disabled = false;
+            this._pushBtn.disabled = this._runBtn.disabled = this._runOnlyBtn.disabled = false;
+        }
+    }
+
+    /**
+     * Value-only fast path — only the poses changed. PATCH the existing pose variables in
+     * place (no re-import, no new variables). Sets both currentValue and initialValue so the
+     * new pose applies whichever one the run resolves (RobFlow runtime is strict here — verify
+     * on the live robot; if a re-run ignores the override, press Push to force a rebuild).
+     */
+    async _override(reg, groups, mode, run) {
+        // `dtype` is the discriminator the PATCH /variables tagged-union needs to pick the right
+        // partial model — without it the backend rejects the body (422, errorCode 250).
+        const dtype = mode === 'cartesian' ? 'cartesianPose' : 'jointPose';
+        let n = 0;
+        for (const g of groups) {
+            for (const it of g.items) {
+                const v = poseValue(mode, it);
+                await this.client.updateVariable(reg.varByKey[String(it.id)], { dtype, currentValue: v, initialValue: v });
+                n += 1;
+            }
+        }
+        this._lastPush = { flowUuid: reg.flowUuid, name: reg.name, variableUuids: Object.values(reg.varByKey), mode };
+        if (run) {
+            await this.client.setDesiredRobotState(2).catch(() => {});
+            this.cycleTimer?.reset(); // fresh run → start measuring cycles from scratch
+            await this.client.runFlow(reg.flowUuid);
+            this._status.textContent = `override + run "${reg.name}" — updated ${n} waypoint value(s)`;
+        } else {
+            this._status.textContent = `override "${reg.name}" — updated ${n} value(s) in place (no re-import)`;
+        }
+    }
+
+    /**
+     * Full rebuild — structure changed (or first push). Delete the previous push's variables
+     * first so re-pushing never piles them up (and dodges the import-time "variable name
+     * already exists → HTTP 500" trap), then import a fresh flow.
+     */
+    async _rebuild(reg, name, groups, opts, signature, run) {
+        if (reg) {
+            for (const varUuid of Object.values(reg.varByKey)) {
+                await this.client.deleteVariable(varUuid).catch(() => {}); // best-effort cleanup
+            }
+        }
+        const { flow, variableUuids, varByKey } = buildWaypointFlow(name, groups, opts);
+        this._status.textContent = `pushing ${variableUuids.length} ${opts.mode} waypoints…`;
+        const created = await this.client.importFlow(flow);
+        const uuid = created?.uuid || flow.uuid;
+        this._pushReg.set(name, { flowUuid: uuid, name: flow.name, mode: opts.mode, signature, varByKey });
+        this._lastPush = { flowUuid: uuid, name: flow.name, variableUuids, mode: opts.mode };
+        if (run) {
+            await this.client.setDesiredRobotState(2).catch(() => {}); // ensure operational
+            this.cycleTimer?.reset(); // fresh run → start measuring cycles from scratch
+            await this.client.runFlow(uuid);
+            this._status.textContent = `running "${flow.name}" (${variableUuids.length} waypoints)`;
+        } else {
+            this._status.textContent = `pushed "${flow.name}" — ${groups.length} node(s), ${variableUuids.length} variables`;
+        }
+    }
+
+    /** Run the most recently pushed flow again — no re-import (re-uses its variables). */
+    async _runLast() {
+        if (!this.client) { this._status.textContent = 'no connection — open Connect first'; return; }
+        const last = this._lastPush;
+        if (!last?.flowUuid) { this._status.textContent = 'nothing pushed yet — Push first'; return; }
+        this._runOnlyBtn.disabled = true;
+        this._status.textContent = `running "${last.name || 'flow'}"…`;
+        try {
+            await this.client.setDesiredRobotState(2).catch(() => {}); // ensure operational
+            this.cycleTimer?.reset(); // fresh run → start measuring cycles from scratch
+            await this.client.runFlow(last.flowUuid);
+            this._status.textContent = `running "${last.name || 'flow'}"`;
+        } catch (e) {
+            const hint = /\b40[13]\b/.test(e.message)
+                ? ' — editor login required (reconnect with the editor password)' : '';
+            this._status.textContent = `run failed: ${e.message}${hint}`;
+            console.error('[RobCo] flow run failed:', e);
+        } finally {
+            this._runOnlyBtn.disabled = false;
         }
     }
 

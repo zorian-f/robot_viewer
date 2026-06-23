@@ -180,12 +180,12 @@ export class ViewPanel {
             const row = el('div', 'display:grid;grid-template-columns:26px 1fr 44px;gap:6px;align-items:center;margin:3px 0;');
             row.append(el('span', 'opacity:.8;', `J${i + 1}`));
             const input = el('input', 'width:100%;accent-color:#2f81f7;');
-            input.type = 'range'; input.min = lo; input.max = hi; input.step = 0.01;
+            input.type = 'range'; input.min = lo; input.max = hi; input.step = 0.001;
             input.value = joint.currentValue ?? 0;
-            const out = el('span', 'text-align:right;opacity:.9;', ((joint.currentValue ?? 0) * 180 / Math.PI).toFixed(0) + '°');
+            const out = el('span', 'text-align:right;opacity:.9;', ((joint.currentValue ?? 0) * 180 / Math.PI).toFixed(1) + '°');
             input.addEventListener('input', () => {
                 const rad = +input.value;
-                out.textContent = (rad * 180 / Math.PI).toFixed(0) + '°';
+                out.textContent = (rad * 180 / Math.PI).toFixed(1) + '°';
                 ModelLoaderFactory.setJointAngle(model, name, rad);
                 const deg = order.map((n) => (model.joints.get(n)?.currentValue ?? 0) * 180 / Math.PI);
                 window._robcoDynamics?.updateStatic?.(deg);

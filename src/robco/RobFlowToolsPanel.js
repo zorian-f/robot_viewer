@@ -171,12 +171,23 @@ export class RobFlowToolsPanel {
         // (Waypoints → Flow moved to the dedicated Waypoints panel.)
 
         // --- Jog (needs client; press-and-hold per joint, requires JOGGING/TEACH mode) ---
+        // Collapsed by default — click the section title to expand.
         this._jogBox = el('div');
-        this._jogBox.append(sectionTitle('Jog (hold)'));
+        const jogTitle = sectionTitle('Jog (hold)  ▸');
+        jogTitle.style.cursor = 'pointer';
+        jogTitle.style.userSelect = 'none';
+        this._jogContent = el('div', 'display:none;');
+        jogTitle.addEventListener('click', () => {
+            const show = this._jogContent.style.display === 'none';
+            this._jogContent.style.display = show ? 'block' : 'none';
+            jogTitle.textContent = show ? 'Jog (hold)  ▾' : 'Jog (hold)  ▸';
+        });
+        this._jogBox.append(jogTitle);
         this._jogSpeed = slider('speed', 0.01, 1, 0.01, 1);
-        this._jogBox.append(this._jogSpeed.row);
+        this._jogContent.append(this._jogSpeed.row);
         this._jogRows = el('div');
-        this._jogBox.append(this._jogRows);
+        this._jogContent.append(this._jogRows);
+        this._jogBox.append(this._jogContent);
         root.append(this._jogBox);
 
         // Hide robot-only sections without a client.

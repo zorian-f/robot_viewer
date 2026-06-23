@@ -50,12 +50,54 @@ function makeJointNode(id, label, repAngles, movements, velocity, acceleration, 
     };
 }
 
-const edge = (src, tgt) => ({
-    id: `vueflow__edge-${src}out-${tgt}in`,
+const edge = (src, tgt, handle = 'out') => ({
+    id: `vueflow__edge-${src}${handle}-${tgt}in`,
     source: src,
-    sourceHandle: 'out',
+    sourceHandle: handle,
     target: tgt,
 });
+
+/** Infinite loop entry node — its "loop" handle runs the body each iteration, forever. */
+function loopNode(id, x) {
+    return {
+        id,
+        type: 'loop',
+        parentNode: null,
+        data: {
+            name: '',
+            valid: true,
+            infinite: true,
+            canBeSaved: true,
+            iterations: { dtype: 'integer', expressionRaw: '1', expressionProcessed: '1' },
+        },
+        position: { x, y: 0 },
+    };
+}
+
+// Stamped on every variable we create so they're trivial to find & bulk-clean in RobFlow.
+const ORRERIUM_TAG = { name: 'orrerium', color: '#8ACED8' };
+
+// Logged once per loop iteration via a messageLog node at the end of the body. The cycle-time
+// reader (CycleTimer) matches message-log entries on this exact text to time the full loop.
+export const CYCLE_MARKER = 'orrerium-cycle';
+
+/** messageLog node — fires each loop pass; its log entry (server-timestamped) marks a cycle. */
+function messageLogNode(id, x) {
+    return {
+        id,
+        type: 'messageLog',
+        parentNode: null,
+        data: {
+            name: '',
+            valid: true,
+            // StringExpression is a literal template — plain text, no quoting needed.
+            message: { dtype: 'string', expressionRaw: CYCLE_MARKER, expressionProcessed: CYCLE_MARKER },
+            logLevel: 'info',
+            canBeSaved: true,
+        },
+        position: { x, y: 0 },
+    };
+}
 
 // ---- Variable-bound waypoint flow (Phase 4) --------------------------------
 // RobFlow variable types: jointPose (jointAngles[] deg) / cartesianPose (position xyz mm +
@@ -70,19 +112,27 @@ function protocolConfigs() {
     };
 }
 
+/**
+ * The pose value stored in a jointPose / cartesianPose variable (and patched on override).
+ * cartesian: position xyz mm + orientation rx,ry,rz EULER deg. joint: jointAngles[] deg.
+ * @returns {object} a fresh value object (never mutates `it`).
+ */
+export function poseValue(mode, it) {
+    return mode === 'cartesian'
+        ? { poseVariableId: null, position: it.position, orientation: it.orientation }
+        : { poseVariableId: null, jointAngles: it.joints };
+}
+
 /** EximJointPoseVariable / EximCartesianPoseVariable for a waypoint. */
 function poseVariable(mode, name, varUuid, it) {
     const common = {
         conflictAction: null, name, description: '', uuid: varUuid,
-        persistent: true, readonly: false, tags: [], syncToStudio: false,
+        persistent: true, readonly: false, tags: [{ ...ORRERIUM_TAG }], syncToStudio: false,
         version: 'v7.1.7', problematic: false, protocolConfigs: protocolConfigs(),
     };
-    if (mode === 'cartesian') {
-        const v = { poseVariableId: null, position: it.position, orientation: it.orientation };
-        return { ...common, dtype: 'cartesianPose', initialValue: v, currentValue: { ...v } };
-    }
-    const v = { poseVariableId: null, jointAngles: it.joints };
-    return { ...common, dtype: 'jointPose', initialValue: v, currentValue: { ...v } };
+    const v = poseValue(mode, it);
+    const dtype = mode === 'cartesian' ? 'cartesianPose' : 'jointPose';
+    return { ...common, dtype, initialValue: v, currentValue: { ...v } };
 }
 
 /** One movement inside a movement node, bound to its pose variable. */
@@ -112,53 +162,64 @@ const sanitize = (s) => String(s || '').replace(/[^A-Za-z0-9]+/g, '_').replace(/
 /**
  * Build an importable EximFlow from grouped waypoints, each movement bound to a pose variable.
  * @param {string} name
- * @param {{label?:string, items:{name?:string, joints?:number[], position?:number[], orientation?:number[]}[]}[]} groups
+ * @param {{label?:string, items:{id?:string, name?:string, joints?:number[], position?:number[], orientation?:number[]}[]}[]} groups
  *        groups[].items each carry joints (deg) for joint mode and/or position(mm)+orientation(deg) for cartesian.
- * @param {{mode?:'joint'|'cartesian', velocity?:number, acceleration?:number}} [opts]
- * @returns {{flow:object, variableUuids:string[]}} flow (POST /flows/import) + the per-waypoint variable uuids.
+ * @param {{mode?:'joint'|'cartesian', velocity?:number, acceleration?:number,
+ *          flowUuid?:string, varUuidFor?:(key:string)=>string|undefined}} [opts]
+ *        flowUuid / varUuidFor let the caller reuse stable ids across re-pushes (override support).
+ * @returns {{flow:object, variableUuids:string[], varByKey:Record<string,string>}}
+ *          flow (POST /flows/import), the per-waypoint variable uuids, and a waypoint-key → uuid map.
  */
 export function buildWaypointFlow(name, groups, opts = {}) {
     const mode = opts.mode === 'cartesian' ? 'cartesian' : 'joint';
     const velocity = opts.velocity ?? 0.1;
     const acceleration = opts.acceleration ?? 0.1;
-    const flowUuid = uuid();
+    const flowUuid = opts.flowUuid || uuid();
     const short = flowUuid.slice(0, 8);
 
     const variables = [];
     const variableUuids = [];
+    const varByKey = {};
     const nodes = [{
         id: 'start', type: 'start', parentNode: null,
         data: { valid: true, validStates: { general: true } }, position: { x: 0, y: 0 },
     }];
     const edges = [];
-    let prev = 'start';
-    let x = 380;
+    // Wrap the whole sequence in an infinite loop: start → loop, and the loop's "loop" (body)
+    // handle drives the movement chain. No stop node — when the body chain ends, the loop just
+    // repeats it forever.
+    nodes.push(loopNode('loop', 380));
+    edges.push(edge('start', 'loop'));
+    let prev = 'loop';
+    let prevHandle = 'loop'; // first body edge leaves the loop via its "loop" (body) handle
+    let x = 760;
     let gIdx = 0;
     let wIdx = 0;
 
     for (const grp of groups) {
         const movements = grp.items.map((it) => {
-            const varUuid = uuid();
+            const key = it.id != null ? String(it.id) : `${wIdx}`;
+            const varUuid = opts.varUuidFor?.(key) || uuid();
             const varName = `wp_${short}_${wIdx}_${sanitize(it.name)}`;
             variables.push(poseVariable(mode, varName, varUuid, it));
             variableUuids.push(varUuid);
+            varByKey[key] = varUuid;
             wIdx += 1;
             return poseMovement(mode, it, varUuid, velocity, acceleration);
         });
         const id = `move-${gIdx}`;
         const label = grp.label || (grp.items.length > 1 ? `Group ${gIdx + 1}` : grp.items[0]?.name || `Move ${gIdx + 1}`);
         nodes.push(moveNode(mode, id, label, movements, x));
-        edges.push(edge(prev, id));
+        edges.push(edge(prev, id, prevHandle));
         prev = id;
+        prevHandle = 'out';
         x += 380;
         gIdx += 1;
     }
-
-    nodes.push({
-        id: 'stop', type: 'stop', parentNode: null,
-        data: { valid: true, validStates: { general: true } }, position: { x, y: 0 },
-    });
-    edges.push(edge(prev, 'stop'));
+    // Cycle marker: log once at the very end of the body so each loop pass emits a timestamped
+    // entry. It's the terminal node — no outgoing edge — and the infinite loop repeats the chain.
+    nodes.push(messageLogNode('cycle-log', x));
+    edges.push(edge(prev, 'cycle-log', prevHandle));
 
     const flow = {
         name,
@@ -187,7 +248,7 @@ export function buildWaypointFlow(name, groups, opts = {}) {
         conflictAction: null,
         csvConfigs: [],
     };
-    return { flow, variableUuids };
+    return { flow, variableUuids, varByKey };
 }
 
 /**

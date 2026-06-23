@@ -1014,12 +1014,16 @@ class App {
         if (this.sceneManager) {
             this.sceneManager.update();
 
-            // Update MuJoCo simulation
+            // Update MuJoCo simulation. Physics mutates the scene every frame, so request a
+            // frame each tick while a sim scene is loaded.
             if (this.mujocoSimulationManager && this.mujocoSimulationManager.hasScene()) {
                 this.mujocoSimulationManager.update(performance.now());
+                this.sceneManager.redraw();
             }
 
-            this.sceneManager.render();
+            // Rendering is on-demand (see SceneManager render loop): no unconditional
+            // per-frame draw here. The scene is drawn when dirty, during pointer drags, or
+            // within the post-input settle window.
         }
     }
 }

@@ -23,6 +23,12 @@ export class SceneManager {
         this._dirty = false;
         this._pendingRender = false;
         this._renderingPaused = false;
+        // Activity-driven rendering: draw while the pointer is dragging the canvas, or
+        // within a short settle window after any user input (covers panel toggles / drag
+        // controls / gizmos that mutate the scene without explicitly requesting a frame).
+        this._pointerActive = false;
+        this._lastInputAt = 0;
+        this._INPUT_SETTLE_MS = 500;
 
         // Event system
         this._eventListeners = {};
@@ -58,6 +64,23 @@ export class SceneManager {
 
         // Mark as needing render on controls change
         this.controls.addEventListener('change', () => this.redraw());
+
+        // Activity listeners for on-demand rendering. A canvas pointer-drag renders
+        // continuously until release (covers orbit/pan + FK joint drag + TCP gizmo + base
+        // drag, none of which request frames themselves). Any discrete user input keeps a
+        // short render window alive so panel toggles that mutate the scene still show.
+        this._onCanvasPointerDown = () => { this._pointerActive = true; this._lastInputAt = performance.now(); };
+        this._onWindowPointerUp = () => { this._pointerActive = false; this._lastInputAt = performance.now(); this.redraw(); };
+        this._onWindowPointerCancel = () => { this._pointerActive = false; };
+        this._markInput = () => { this._lastInputAt = performance.now(); };
+        canvas.addEventListener('pointerdown', this._onCanvasPointerDown);
+        window.addEventListener('pointerup', this._onWindowPointerUp);
+        window.addEventListener('pointercancel', this._onWindowPointerCancel);
+        window.addEventListener('blur', this._onWindowPointerCancel);
+        window.addEventListener('keydown', this._markInput, true);
+        window.addEventListener('wheel', this._markInput, { capture: true, passive: true });
+        window.addEventListener('input', this._markInput, true);
+        window.addEventListener('change', this._markInput, true);
 
         // Set mouse buttons
         if (this.controls.mouseButtons) {
@@ -119,8 +142,13 @@ export class SceneManager {
      */
     startRenderLoop() {
         const renderLoop = () => {
-            // Only render when needed (controlled by _dirty flag)
-            if (this._dirty) {
+            // On-demand: render only when the scene is dirty, the pointer is dragging, or
+            // we're inside the post-input settle window. Idle (static view, no input,
+            // no stream/sim) draws nothing.
+            const active = this._dirty
+                || this._pointerActive
+                || (performance.now() - this._lastInputAt) < this._INPUT_SETTLE_MS;
+            if (active) {
                 this.renderer.render(this.scene, this.camera);
                 this._dirty = false;
             }
@@ -139,6 +167,18 @@ export class SceneManager {
         if (this.resizeObserver) {
             this.resizeObserver.disconnect();
             this.resizeObserver = null;
+        }
+
+        // Remove on-demand rendering activity listeners
+        if (this._markInput) {
+            this.canvas.removeEventListener('pointerdown', this._onCanvasPointerDown);
+            window.removeEventListener('pointerup', this._onWindowPointerUp);
+            window.removeEventListener('pointercancel', this._onWindowPointerCancel);
+            window.removeEventListener('blur', this._onWindowPointerCancel);
+            window.removeEventListener('keydown', this._markInput, true);
+            window.removeEventListener('wheel', this._markInput, { capture: true });
+            window.removeEventListener('input', this._markInput, true);
+            window.removeEventListener('change', this._markInput, true);
         }
     }
 
@@ -293,9 +333,40 @@ export class SceneManager {
         }
     }
 
+    /**
+     * Recursively dispose the GPU resources (geometries, materials, textures) owned by an
+     * Object3D subtree. Called when a model is unloaded/replaced so loading many models in
+     * one session does not leak GPU memory.
+     */
+    _disposeObject3D(root) {
+        if (!root) return;
+        const seenMaterials = new Set();
+        const disposeMaterial = (mat) => {
+            if (!mat || seenMaterials.has(mat)) return;
+            seenMaterials.add(mat);
+            // Dispose any texture-valued material properties (map, normalMap, envMap, ...).
+            for (const key of Object.keys(mat)) {
+                const value = mat[key];
+                if (value && value.isTexture) value.dispose();
+            }
+            mat.dispose();
+        };
+        root.traverse((obj) => {
+            if (obj.geometry) obj.geometry.dispose();
+            const material = obj.material;
+            if (Array.isArray(material)) material.forEach(disposeMaterial);
+            else disposeMaterial(material);
+        });
+    }
+
     removeModel(model) {
-        if (model && model.threeObject && model.threeObject.parent) {
-            model.threeObject.parent.remove(model.threeObject);
+        if (model && model.threeObject) {
+            if (model.threeObject.parent) {
+                model.threeObject.parent.remove(model.threeObject);
+            }
+            // Free GPU resources (geometries/materials/textures) so repeated loads/reloads
+            // don't leak memory. Safe here: the model is being discarded.
+            this._disposeObject3D(model.threeObject);
         }
 
         // Clear all managers

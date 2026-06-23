@@ -123,6 +123,8 @@ export async function connectLiveSession(app, opts) {
         // While teaching, the dynamics panel follows the gizmo (updateStatic), not the stream.
         if (dynamics && !app._teachActive) dynamics.update(angles, performance.now());
         if (teach) teach.syncTcp();
+        // Streamed updates aren't user input, so request an on-demand frame to show them.
+        app.sceneManager?.redraw();
     });
 
     // RobFlow's own cartesian TCP pose — used verbatim for cartesian waypoint capture, since
@@ -133,6 +135,7 @@ export async function connectLiveSession(app, opts) {
         latestBaseShift = bs;
         // Single source of truth: the base shift moves the world (inverse), not the robot root.
         window._robcoBaseFrame?.setBaseShiftWS(bs);
+        app.sceneManager?.redraw();
     });
 
     socket.on('payload', (p) => {

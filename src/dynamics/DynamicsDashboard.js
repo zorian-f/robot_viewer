@@ -15,6 +15,15 @@ function utilColor(u) {
     return '#f85149'; // red
 }
 
+// i²t heat index colour (% of the limiting threshold; the drive starts limiting at 100,
+// releases at 50). Uses a cooler palette to read as "thermal" vs the load bar above.
+function heatColor(h) {
+    if (h == null) return 'transparent';
+    if (h < 50) return '#2f81f7'; // blue (cool)
+    if (h < 100) return '#d29922'; // amber (warming)
+    return '#f85149'; // red (limiting)
+}
+
 export class DynamicsDashboard {
     /**
      * @param {string[]} jointLabels - one label per joint (base->flange).
@@ -27,7 +36,10 @@ export class DynamicsDashboard {
         this.onSettingsChange = null;
         /** @type {?(kg:number)=>void} */
         this.onPayloadChange = null;
+        /** @type {?(on:boolean)=>void} */
+        this.onMotorModelChange = null;
         this.settings = DynamicsDashboard._loadSettings();
+        this._motorModel = DynamicsDashboard._loadMotorModel();
         const pay = DynamicsDashboard._loadPayload();
         this._payloadKg = pay.kg;
         this._payloadCom = pay.com; // CoM offset from the flange/TCP, in mm
@@ -62,6 +74,23 @@ export class DynamicsDashboard {
         return { ...this.settings };
     }
 
+    /** @returns {boolean} whether the motor model (friction + inertia + current) is applied. */
+    getMotorModel() {
+        return this._motorModel;
+    }
+
+    static _loadMotorModel() {
+        try {
+            const v = JSON.parse(localStorage.getItem('robco-dyn-motormodel'));
+            if (typeof v === 'boolean') return v;
+        } catch { /* ignore */ }
+        return true; // default: real-hardware-accurate
+    }
+
+    static _saveMotorModel(on) {
+        try { localStorage.setItem('robco-dyn-motormodel', JSON.stringify(!!on)); } catch { /* ignore */ }
+    }
+
     static _loadSettings() {
         try {
             const s = JSON.parse(localStorage.getItem('robco-dyn-settings'));
@@ -86,7 +115,7 @@ export class DynamicsDashboard {
             font: 12px/1.4 ui-monospace, Menlo, Consolas, monospace;
             color: #e6edf3; background: rgba(13,17,23,0.88);
             border: 1px solid rgba(255,255,255,0.12); border-radius: 10px;
-            padding: 10px 12px; min-width: 360px; backdrop-filter: blur(6px);
+            padding: 10px 12px; min-width: 400px; backdrop-filter: blur(6px);
             box-shadow: 0 6px 24px rgba(0,0,0,0.4);`;
 
         const title = document.createElement('div');
@@ -135,9 +164,9 @@ export class DynamicsDashboard {
 
         const head = document.createElement('div');
         head.style.cssText =
-            'display:grid;grid-template-columns:34px 56px 56px 56px 64px 1fr;gap:6px;' +
+            'display:grid;grid-template-columns:30px 48px 48px 48px 54px 48px 1fr;gap:6px;' +
             'opacity:.6;margin-bottom:4px;';
-        ['', '° ', '°/s', '°/s²', 'N·m', 'util'].forEach((h) => {
+        ['', '°', '°/s', '°/s²', 'N·m', 'A', 'util'].forEach((h) => {
             const c = document.createElement('div');
             c.textContent = h;
             c.style.textAlign = h === '' ? 'left' : 'right';
@@ -148,7 +177,7 @@ export class DynamicsDashboard {
         this.jointLabels.forEach((label, i) => {
             const row = document.createElement('div');
             row.style.cssText =
-                'display:grid;grid-template-columns:34px 56px 56px 56px 64px 1fr;gap:6px;' +
+                'display:grid;grid-template-columns:30px 48px 48px 48px 54px 48px 1fr;gap:6px;' +
                 'align-items:center;padding:2px 0;';
             const cells = {};
             const mk = (key, align = 'right') => {
@@ -163,19 +192,28 @@ export class DynamicsDashboard {
             mk('vel');
             mk('acc');
             mk('torque');
+            mk('current');
             // utilization bar
             const barWrap = document.createElement('div');
             barWrap.style.cssText =
                 'height:12px;background:rgba(255,255,255,0.08);border-radius:6px;overflow:hidden;position:relative;';
             const bar = document.createElement('div');
             bar.style.cssText = 'height:100%;width:0;border-radius:6px;transition:width .08s linear;';
+            // i²t thermal underline: thin bar along the bottom = accumulated motor heat index
+            // (0..100% = the drive's current-limiting threshold). Distinct from the load bar.
+            const heat = document.createElement('div');
+            heat.style.cssText =
+                'position:absolute;left:0;bottom:0;height:3px;width:0;border-radius:2px;transition:width .15s linear;';
             const pct = document.createElement('span');
             pct.style.cssText =
                 'position:absolute;right:5px;top:0;line-height:12px;font-size:10px;color:#fff;';
             barWrap.appendChild(bar);
+            barWrap.appendChild(heat);
             barWrap.appendChild(pct);
             row.appendChild(barWrap);
             cells.bar = bar;
+            cells.heat = heat;
+            cells.barWrap = barWrap;
             cells.pct = pct;
             cells.title = label;
             row.title = label;
@@ -243,6 +281,31 @@ export class DynamicsDashboard {
 
         wrap.append(lbl, num, unit, hz);
         container.appendChild(wrap);
+
+        // Motor-model toggle: ON = real-hardware (NE + friction + reflected inertia + current),
+        // OFF = twin-accurate (rigid-body Newton-Euler torque only).
+        const mwrap = document.createElement('div');
+        mwrap.style.cssText = 'margin-top:6px;display:flex;align-items:center;gap:8px;font-size:11px;';
+        const mcb = document.createElement('input');
+        mcb.type = 'checkbox';
+        mcb.checked = this._motorModel;
+        mcb.style.cssText = 'accent-color:#3fb950;cursor:pointer;margin:0;';
+        const mlbl = document.createElement('label');
+        mlbl.textContent = 'Motor model (friction + inertia)';
+        mlbl.prepend(mcb);
+        mlbl.style.cssText = 'display:flex;align-items:center;gap:5px;cursor:pointer;';
+        const mnote = document.createElement('span');
+        mnote.style.cssText = 'opacity:.55;margin-left:auto;';
+        const updNote = () => { mnote.textContent = mcb.checked ? 'real' : 'twin'; };
+        mcb.addEventListener('change', () => {
+            this._motorModel = mcb.checked;
+            DynamicsDashboard._saveMotorModel(this._motorModel);
+            updNote();
+            this.onMotorModelChange?.(this._motorModel);
+        });
+        updNote();
+        mwrap.append(mlbl, mnote);
+        container.appendChild(mwrap);
     }
 
     /**
@@ -251,19 +314,39 @@ export class DynamicsDashboard {
      * @param {number[]} t.velocity    - rad/s
      * @param {number[]} t.acceleration- rad/s²
      * @param {number[]} t.torque      - N·m
-     * @param {(number|null)[]} t.utilization - 0..1
+     * @param {(number|null)[]} t.utilization - torque utilization, 0..1
+     * @param {(number|null)[]} [t.current]     - motor q-axis current, A
+     * @param {(number|null)[]} [t.currentUtil] - current utilization (vs peak current), 0..1
+     * @param {(number|null)[]} [t.heat]        - i²t heat index, 0..250 (%)
      */
-    render({ angleDeg, velocity, acceleration, torque, utilization }) {
+    render({ angleDeg, velocity, acceleration, torque, utilization, current, currentUtil, heat }) {
         for (let i = 0; i < this.rows.length; i++) {
             const r = this.rows[i];
             r.angle.textContent = (angleDeg?.[i] ?? 0).toFixed(1);
             r.vel.textContent = ((velocity?.[i] ?? 0) * RAD2DEG).toFixed(1);
             r.acc.textContent = ((acceleration?.[i] ?? 0) * RAD2DEG).toFixed(0);
             r.torque.textContent = (torque?.[i] ?? 0).toFixed(1);
-            const u = utilization?.[i];
+            const iq = current?.[i];
+            r.current.textContent = iq == null ? '—' : iq.toFixed(1);
+            // The bar shows the binding constraint: torque (mechanical/gearbox) and current
+            // (electrical/thermal) are different ceilings — whichever is higher is the limit.
+            const ut = utilization?.[i];
+            const uc = currentUtil?.[i];
+            const u = ut == null && uc == null ? null : Math.max(ut ?? 0, uc ?? 0);
+            const binds = uc != null && (ut == null || uc > ut) ? 'I' : 'τ';
+            const uLabel = u == null ? '—' : (u > 1 ? `>100% ${binds}` : `${(u * 100).toFixed(0)}% ${binds}`);
             r.bar.style.width = u == null ? '0' : `${Math.min(100, u * 100).toFixed(0)}%`;
             r.bar.style.background = utilColor(u);
-            r.pct.textContent = u == null ? '—' : `${(u * 100).toFixed(0)}%`;
+            r.pct.textContent = uLabel;
+            // i²t thermal underline (heat is a %; 100 = limiting threshold).
+            const h = heat?.[i];
+            r.heat.style.width = h == null ? '0' : `${Math.min(100, h).toFixed(0)}%`;
+            r.heat.style.background = heatColor(h);
+            if (r.barWrap) {
+                r.barWrap.title = h == null
+                    ? r.title
+                    : `${r.title} — load ${uLabel}, i²t heat ${h.toFixed(0)}%`;
+            }
         }
     }
 

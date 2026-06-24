@@ -8,6 +8,7 @@
 import * as THREE from 'three';
 import { JointDerivatives } from './JointDerivatives.js';
 import { MujocoDynamics } from './MujocoDynamics.js';
+import { I2tModel } from './I2tModel.js';
 import { DynamicsDashboard } from './DynamicsDashboard.js';
 
 const DEG2RAD = Math.PI / 180;
@@ -33,6 +34,14 @@ export class DynamicsController {
         dash.onSettingsChange = (s) => ctrl.deriv.setOptions(s);
         ctrl._initMarker(model);
 
+        // Motor-model toggle (real-hardware vs twin-accurate). Recompute on change so the
+        // panel updates even while idle.
+        ctrl.dyn.setMotorModel(dash.getMotorModel?.() ?? true);
+        dash.onMotorModelChange = (on) => {
+            ctrl.dyn.setMotorModel(on);
+            if (ctrl._lastAngles) ctrl.update(ctrl._lastAngles, performance.now());
+        };
+
         // TCP payload (kg + CoM offset) -> rebuild the dynamics model with a load at the flange.
         dash.onPayloadChange = (kg, com) => ctrl.setPayload(kg, com);
         const payload0 = dash.getPayload?.() || 0;
@@ -47,18 +56,46 @@ export class DynamicsController {
         this.dyn = dyn;
         this.dash = dash;
         this.deriv = new JointDerivatives();
+        // i²t heat index, seeded from the drives' motor-side current limits and per-motor peak
+        // times (Synapticon 0x200A:2, baked from the Circulo .csv; unknown motors default 10 s).
+        this.i2t = new I2tModel(dyn.ratedCurrent, dyn.maxCurrent, { tPeakSec: dyn.peakTime });
+        this._lastT = null; // ms, for real-Δt thermal integration
     }
 
     /**
      * @param {number[]} anglesDeg - live joint angles (degrees), base->flange.
      * @param {number} [tMs] - sample timestamp.
      */
-    update(anglesDeg, tMs) {
+    /**
+     * Re-express world gravity in the robot base frame when the base mount orientation changes
+     * (wall/ceiling mounts shift the static hold torque substantially). Rebuilds the MuJoCo
+     * model only on an actual orientation change. Reads the BaseFrame lazily (it may be created
+     * after this controller). g_base = baseQuat⁻¹ · [0,0,-9.81].
+     */
+    _syncGravity() {
+        const base = this._baseFrame || (typeof window !== 'undefined' ? window._robcoBaseFrame : null);
+        if (!base?.baseQuat) return;
+        this._baseFrame = base;
+        const q = base.baseQuat;
+        const key = `${q.x},${q.y},${q.z},${q.w}`;
+        if (key === this._baseQuatKey) return;
+        this._baseQuatKey = key;
+        const g = new THREE.Vector3(0, 0, -9.81).applyQuaternion(q.clone().invert());
+        this.dyn.setGravity([g.x, g.y, g.z]);
+    }
+
+    update(anglesDeg, tMs = performance.now()) {
         this._lastAngles = anglesDeg;
+        this._syncGravity();
         const qRad = anglesDeg.map((d) => d * DEG2RAD);
         const { velocity, acceleration } = this.deriv.update(qRad, tMs);
-        const { torque, utilization } = this.dyn.computeTorques(qRad, velocity, acceleration);
-        this.dash.render({ angleDeg: anglesDeg, velocity, acceleration, torque, utilization });
+        const { torque, utilization, current, currentUtil } =
+            this.dyn.computeTorques(qRad, velocity, acceleration);
+        // Integrate the i²t heat index over real elapsed time (thermal, not the differentiation Δt).
+        const dtSec = this._lastT == null ? 0 : (tMs - this._lastT) / 1000;
+        this._lastT = tMs;
+        const heat = this.i2t.update(current, dtSec);
+        this.dash.render({ angleDeg: anglesDeg, velocity, acceleration, torque, utilization, current, currentUtil, heat });
     }
 
     /**
@@ -68,10 +105,18 @@ export class DynamicsController {
      */
     updateStatic(anglesDeg) {
         this._lastAngles = anglesDeg;
+        this._syncGravity();
         const qRad = anglesDeg.map((d) => d * DEG2RAD);
         const zeros = qRad.map(() => 0);
-        const { torque, utilization } = this.dyn.computeTorques(qRad, zeros, zeros);
-        this.dash.render({ angleDeg: anglesDeg, velocity: zeros, acceleration: zeros, torque, utilization });
+        // At zero velocity/acceleration the friction and motor-inertia terms vanish, so this is
+        // the pure gravity + payload hold torque (Coulomb friction at standstill is indeterminate
+        // and intentionally not added).
+        const { torque, utilization, current, currentUtil } = this.dyn.computeTorques(qRad, zeros, zeros);
+        // A manual gizmo pose is a what-if, not a real time series: hold the heat index (don't
+        // accumulate) and reset the thermal clock so the next live sample sees no fake gap.
+        this._lastT = null;
+        const heat = this.i2t.heat.slice();
+        this.dash.render({ angleDeg: anglesDeg, velocity: zeros, acceleration: zeros, torque, utilization, current, currentUtil, heat });
         this.deriv.reset(); // so a later live stream doesn't differentiate across the manual pose
     }
 

@@ -57,7 +57,7 @@ export class DynamicsController {
         this.dash = dash;
         this.deriv = new JointDerivatives();
         // i²t heat index, seeded from the drives' motor-side current limits and per-motor peak
-        // times (Synapticon 0x200A:2, baked from the Circulo .csv; unknown motors default 10 s).
+        // times (from the drive's overload configuration; unknown motors default 10 s).
         this.i2t = new I2tModel(dyn.ratedCurrent, dyn.maxCurrent, { tPeakSec: dyn.peakTime });
         this._lastT = null; // ms, for real-Δt thermal integration
     }

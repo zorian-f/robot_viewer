@@ -1,25 +1,25 @@
 /**
- * Per-joint motor overload (i²t) heat index — a client-side replica of the Synapticon
- * Circulo drive's motor-overload protection (SOMANET object 0x200A), which is what
- * RobControl reports verbatim as joint "utilization" / overload percent.
+ * Per-joint motor overload (i²t) heat index — a client-side replica of the servo drive's
+ * i²t motor-overload protection, the same index the drive reports as joint "utilization" /
+ * overload percent.
  *
  * The drive tracks the copper-loss excess over the continuous (rated) current and integrates
- * it into a heat index that reaches 100% after running at the maximum current for the
+ * it into a heat index that reaches 100% after running at the maximum current for a
  * configured "peak time", then would limit current (and releases the limit at 50%). We
  * reproduce the index — not the current limiting — from our estimated motor current:
  *
  *   H[k] = clamp( H[k−1] + 100 · (i² − i_rated²) / ((i_max² − i_rated²) · t_peak) · Δt , 0, 250 )   [%]
  *
  * One formula covers both charge (i > i_rated) and recovery (i < i_rated). Inputs per joint:
- *   i_rated = motor.rated_current        (CiA402 0x6075)
- *   i_max   = motor.rated_current · peak_current‰/1000   (CiA402 0x6073)
- *   t_peak  = Synapticon 0x200A:2, seconds (D86 = 10 s; varies per Circulo config)
+ *   i_rated = motor.rated_current
+ *   i_max   = motor.rated_current · peak_current‰/1000
+ *   t_peak  = drive peak time, seconds (varies per motor; ~10 s typical)
  *
  * Units must match the current estimate (motor-side amps, Kt-consistent — see MujocoDynamics).
- * The true value lives in drive firmware; t_peak is the one parameter not in the JSON
- * descriptor (it's in the per-module Circulo `.csv`), so it defaults here and is tunable.
+ * t_peak is not in the JSON descriptor (it comes from the drive's overload configuration), so
+ * it defaults here and is tunable.
  */
-const MAX_HEAT = 250; // % — Synapticon clamps the tracking variable at 250%.
+const MAX_HEAT = 250; // % — the drive clamps the tracking variable at 250%.
 const LIMIT_PCT = 100; // % — at/above this the real drive limits current to rated.
 
 export class I2tModel {
@@ -42,7 +42,7 @@ export class I2tModel {
         this.heat = new Array(this.n).fill(0);
     }
 
-    /** @param {number|(number|null)[]} s peak time(s) (Synapticon 0x200A:2), per joint or scalar. */
+    /** @param {number|(number|null)[]} s peak time(s) in seconds, per joint or scalar. */
     setPeakTime(s) {
         this.tPeak = Array.from({ length: this.n }, (_, i) => {
             const v = Array.isArray(s) ? s[i] : s;

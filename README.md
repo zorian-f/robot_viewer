@@ -47,11 +47,18 @@ your models never leave your device.
 - A draggable **TCP gizmo** with live IK preview, in Move or Rotate mode.
 
 ### Dynamics
-- Live per-joint **dashboard**: angle, velocity, acceleration, torque and utilization.
-- Inverse-dynamics torque + utilization (MuJoCo), with a velocity/acceleration estimator
-  and an optional fixed-Δt smoothing interval.
-- Editable **TCP payload** (mass + center-of-mass offset) reflected in torque utilization,
-  with a payload marker at the tool point.
+- Live per-joint **dashboard**: angle, velocity, acceleration, torque, motor current, and
+  **two utilization bars** — *mechanical* (torque vs. the gearbox limit) and *electrical*
+  (motor current vs. a speed-dependent drive limit) — plus an **i²t thermal** indicator for
+  sustained load.
+- Inverse-dynamics torque from MuJoCo, optionally extended by a **motor model** (joint
+  friction + reflected rotor inertia) so the numbers reflect a real geared joint rather than
+  an idealized rigid body. A toggle switches between the two; a velocity/acceleration
+  estimator with an optional fixed-Δt smoothing interval feeds it.
+- Editable **TCP payload** (mass + center-of-mass offset) with a payload marker at the tool
+  point, and **base-orientation-aware gravity** (wall/ceiling mounts) — both reflected in the
+  torque, current and utilization.
+- See [How joint dynamics are computed](#how-joint-dynamics-are-computed) for the exact model.
 
 ### Cell setup
 - **Movable robot base** (world-frame inverse-transform) with the base pose persisted
@@ -96,6 +103,91 @@ This integration is implemented entirely against RobFlow's own network interface
 credentials **you** supply at runtime. No RobFlow/RobCo software, assets, or credentials are
 bundled in this repository. If you don't use RobFlow, every feature above except this
 section works fully offline. See the [Disclaimer](#disclaimer).
+
+---
+
+## How joint dynamics are computed
+
+The Dynamics dashboard turns a stream of joint **positions** into per-joint torque, motor
+current and utilization. It all runs in the browser, **per joint**, using parameters read
+from each module's own descriptor (mass/inertia, gear ratio, friction coefficients, motor
+torque constant, current limits) — drive sizes vary widely, so nothing is a global constant.
+
+### 1. Velocity & acceleration from positions
+The stream carries joint **positions** only. Plain finite differences are noisy in
+acceleration, so a short sliding window per joint is fit with a least-squares quadratic
+`q(t) ≈ a + b·τ + c·τ²`; at the latest sample velocity = `b` and acceleration = `2c`. A fixed
+sample interval Δt can be assumed instead of wall-clock arrival times to reject transport
+jitter (toggle + interval in the panel).
+
+### 2. Rigid-body torque (MuJoCo inverse dynamics)
+A dynamics-only MuJoCo model is built from the module masses, inertias and kinematics. For
+the joint state `(q, q̇, q̈)`, `mj_inverse` returns the rigid-body Newton–Euler torque `τ_NE`
+per joint (gravity + link inertia + Coriolis). Gravity is expressed in the robot **base
+frame**, so tilting the base (wall/ceiling mount) changes the static hold torque correctly,
+and a TCP **payload** (mass + CoM) is welded at the flange and included.
+
+### 3. Motor model (optional, on by default)
+Rigid-body torque alone describes an idealized arm; a real geared joint also fights friction
+and must accelerate its own rotor. With the motor model on, two terms are added per joint:
+
+- **Reflected rotor inertia:** `τ_inertia = q̈ · N² · J_motor`  (`N` = gear ratio, `J_motor` = rotor inertia)
+- **Friction:** `τ_friction = c_v·q̇ + (c_c + c_load·τ_NE²) · sin(atan(k·q̇))`
+  - `c_v` viscous and `c_c` Coulomb coefficients (per joint); `c_load` an optional
+    load-dependent term (`τ_NE` is the rigid-body torque from step 2).
+  - `sin(atan(k·q̇))` is a smooth `sign(q̇)` (→ ±1) so Coulomb friction doesn't chatter around
+    zero speed; `k` sets how sharply it engages.
+
+Total joint torque is **`τ = τ_NE + τ_inertia + τ_friction`**. At rest (`q̇ = q̈ = 0`) both
+added terms vanish, so a static pose shows the pure gravity/payload hold torque. Turning the
+motor model **off** reproduces the idealized rigid-body torque (useful for comparison).
+
+### 4. Motor current
+Joint torque maps to motor torque through the gear, and motor torque to current through the
+torque constant `Kt` (linear region — no field weakening, no separate gear-efficiency factor):
+
+```
+τ_motor = τ / N            i_q = τ_motor / Kt = τ / (N · Kt)
+```
+
+### 5. Two utilizations — mechanical vs. electrical
+These are **independent ceilings**, so both are shown:
+
+- **Mechanical** = `|τ| / τ_peak`, against the joint's gearbox peak torque.
+- **Electrical** = `|i_q| / i_avail(q̇)`. The drive's current limit `i_max` is **derated with
+  speed** by back-EMF: as the joint spins up, available voltage — and therefore current and
+  torque — falls, reaching zero at the motor's no-load speed `ω₀`:
+
+  ```
+  i_avail(q̇) = i_max · max(0, 1 − N·|q̇| / ω₀)
+  ```
+
+  At standstill this is simply `|i_q| / i_max`; near top speed it tightens sharply. This is
+  why the binding limit can switch from mechanical (low speed) to electrical (high speed).
+
+### 6. i²t thermal (overload) index
+A motor tolerates brief overcurrent but accumulates heat. The dashboard reproduces the
+drive's i²t motor-overload model: a per-joint heat index `H` integrates the copper-loss
+excess over the continuous (rated) current and reaches 100% (the limiting threshold) after
+running at the maximum current for a per-motor *peak time* `t_peak`:
+
+```
+H ← clamp( H + 100 · (i_q² − i_rated²) / ((i_max² − i_rated²) · t_peak) · Δt , 0, 250 )   [%]
+```
+
+It charges above the rated current, recovers (more slowly) below it, and is drawn as a thin
+thermal underline on the current bar. Unlike the instantaneous bars it captures **sustained**
+load — short spikes are tolerated, a held overload climbs toward the limit.
+
+### Notes & limitations
+- The stream carries **commanded (desired)** joint angles, so this is *planned* utilization:
+  smooth and noise-free, but it does not reflect real tracking error or external disturbances.
+- Friction, inertia, current and overload parameters come from the robot's per-module data
+  and the drive's documented behavior; the no-load speeds and overload time constants are a
+  small built-in per-motor table. Treat the electrical figures as well-grounded **estimates**,
+  not certified drive readings.
+- Velocity and especially acceleration are estimated from positions, so the
+  acceleration-dependent term (rotor inertia) is the noisiest; the fixed-Δt smoothing helps.
 
 ---
 

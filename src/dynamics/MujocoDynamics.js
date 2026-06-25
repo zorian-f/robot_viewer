@@ -2,23 +2,23 @@
  * Inverse-dynamics torque + utilization for a RobCo arm, via MuJoCo-WASM.
  *
  * MuJoCo's `mj_inverse` gives only the rigid-body Newton-Euler torque (gravity + link
- * inertia + Coriolis) — which is exactly what the digital twin computes (its motor model is
- * compiled out). To match a *real* RobControl joint we add, per drive, the two terms the
- * firmware adds on top (verified against robcontrol `motor_model.cpp` / `robot_model.cpp`):
+ * inertia + Coriolis) — an idealized rigid arm. To match a *real* geared joint we add, per
+ * drive, the two terms a geared joint also exhibits:
  *
  *   τ_total = τ_NE  +  motor-inertia torque  +  friction torque
  *     motor-inertia : ddq · gear_ratio² · motor_inertia          (reflected rotor inertia)
  *     friction      : viscous·q̇ + (coulomb + quad·τ_NE²)·sin(atan(k·q̇))   (k = FRICTION_RAMP)
  *
- * and the motor q-axis current that produces it (no field weakening, no gear efficiency):
+ * and the motor q-axis current that produces it (linear region; no field weakening, no gear
+ * efficiency factor):
  *
  *   i_q = (τ_total / gear_ratio) / torque_constant
  *
  * All parameters are read per joint from each module's own descriptor — drive types differ
  * wildly (Kt, gear ratio, friction span 4→120 N·m, different motors/manufacturers), so
  * nothing is a global constant. Current/overload use the motor-side current limits
- * (motor.rated_current + motor.peak_current as ‰ of rated), which match the Circulo drive's
- * CiA402 objects 0x6075/0x6073.
+ * (motor.rated_current + motor.peak_current as ‰ of rated), i.e. the drive's rated/peak
+ * current.
  *
  * Validated against a known pendulum (m·g·L) and the real demo arm (see scripts/mj_validate.mjs).
  */
@@ -27,8 +27,8 @@ import { noLoadSpeedRadFor, peakTimeSecFor } from './motorEnvelopes.js';
 
 const DRIVE_TYPES = new Set(['Drive', 'BaseDrive']);
 
-// Coulomb-friction velocity smoothing: τ_c·sin(atan(k·q̇)) → ±τ_c. RobControl default
-// `friction_model_ramping_factor` = 100 (program_arguments.hpp); q̇ in rad/s, joint side.
+// Coulomb-friction velocity smoothing: τ_c·sin(atan(k·q̇)) → ±τ_c. Default ramping factor
+// 100 (q̇ in rad/s, joint side) — sharp but smooth engagement just off zero speed.
 const FRICTION_RAMP = 100;
 
 export class MujocoDynamics {
@@ -61,8 +61,8 @@ export class MujocoDynamics {
         this.frictionViscous = drives.map((d) => d.friction_parameters?.friction_viscous ?? 0);
         // Load-dependent friction (quad·τ_NE²); only populated on D193-class modules, else 0.
         this.frictionLoadQuad = drives.map((d) => d.friction_parameters?.friction_load_dependent_quadratic ?? 0);
-        // Current: Kt (motor side) + motor-side current limits. peak_current is ‰ of rated
-        // (CiA402 0x6073), so i_max = rated_current · peak_current/1000.
+        // Current: Kt (motor side) + motor-side current limits. peak_current is ‰ of rated,
+        // so i_max = rated_current · peak_current/1000.
         this.torqueConstant = drives.map((d) => d.motor?.torque_constant ?? null);
         this.ratedCurrent = drives.map((d) => d.motor?.rated_current ?? null);
         this.maxCurrent = drives.map((d) => {
@@ -72,8 +72,8 @@ export class MujocoDynamics {
         });
         // No-load speed (rad/s, motor side) for the back-EMF torque-speed rolloff (#4).
         this.noLoadSpeed = drives.map((d) => noLoadSpeedRadFor(d.motor?.name));
-        // i²t peak time (s) per drive, from the Circulo config (Synapticon 0x200A:2). null
-        // for unknown motors → the i²t model falls back to a default.
+        // i²t peak time (s) per drive, from the drive's overload configuration. null for
+        // unknown motors → the i²t model falls back to a default.
         this.peakTime = drives.map((d) => peakTimeSecFor(d.motor?.name));
 
         // Persisted model options (payload + gravity) so a rebuild from one (e.g. payload
@@ -120,7 +120,7 @@ export class MujocoDynamics {
      * Inverse dynamics for a joint state (radians, rad/s, rad/s²).
      *
      * Returns the total joint torque (rigid-body NE plus, when the motor model is on, the
-     * firmware's friction + reflected-motor-inertia terms), the estimated motor q-axis
+     * motor model's friction + reflected-rotor-inertia terms), the estimated motor q-axis
      * current, and utilization fractions against both the torque limits and the current
      * limits. Utilization arrays are null per joint where the relevant limit is unknown.
      *
@@ -153,7 +153,7 @@ export class MujocoDynamics {
 
         for (let i = 0; i < nq; i++) {
             // Rigid-body Newton-Euler torque (gravity + link inertia + Coriolis) = the friction
-            // "load" term in the firmware, and the only torque the digital twin produces.
+            // "load" term, and the only torque the idealized rigid-body model produces.
             const ne = data.qfrc_inverse[i];
             neTorque[i] = ne;
             const dq = qdot ? (qdot[i] ?? 0) : 0;

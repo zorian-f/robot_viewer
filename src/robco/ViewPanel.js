@@ -45,6 +45,7 @@ export class ViewPanel {
     constructor(sm, model) {
         this.sm = sm;
         this.model = model;
+        this._toggles = {}; // key -> {cb, onChange} so a session can save/restore each toggle
         this._build();
     }
 
@@ -55,12 +56,34 @@ export class ViewPanel {
         this._buildJointSliders();
     }
 
-    _check(labelText, onChange, checked = false) {
+    _check(labelText, onChange, checked = false, key = null) {
         const row = el('label', 'display:flex;align-items:center;gap:8px;margin:4px 0;cursor:pointer;');
         const cb = el('input'); cb.type = 'checkbox'; cb.checked = checked; cb.style.accentColor = '#2f81f7';
         cb.addEventListener('change', () => { try { onChange(cb.checked); } catch (e) { console.warn('[RobCo] view toggle:', e); } this._render(); });
         row.append(cb, el('span', 'opacity:.9;', labelText));
+        if (key) this._toggles[key] = { cb, onChange };
         return row;
+    }
+
+    /** Current on/off state of every named toggle — for a session snapshot. */
+    getState() {
+        const s = {};
+        for (const k of Object.keys(this._toggles)) s[k] = !!this._toggles[k].cb.checked;
+        return s;
+    }
+
+    /** Apply a saved toggle state: flip the checkbox and run its action only where it differs. */
+    applyState(state) {
+        if (!state) return;
+        for (const k of Object.keys(state)) {
+            const t = this._toggles[k];
+            if (!t) continue;
+            const want = !!state[k];
+            if (t.cb.checked === want) continue;
+            t.cb.checked = want;
+            try { t.onChange(want); } catch (e) { console.warn('[RobCo] view applyState', k, e); }
+        }
+        this._render();
     }
 
     _render() { this.sm.redraw?.(); this.sm.render?.(); }
@@ -99,24 +122,24 @@ export class ViewPanel {
 
         // Geometry
         body.append(title('Geometry'));
-        body.append(this._check('Visual meshes', (on) => this.sm.visualizationManager?.toggleVisual(on, this._model()), true));
-        body.append(this._check('Collision meshes', (on) => this._setCollision(on)));
-        body.append(this._check('Waypoints', (on) => window._robcoWaypointStore?.setVisible(on), true));
+        body.append(this._check('Visual meshes', (on) => this.sm.visualizationManager?.toggleVisual(on, this._model()), true, 'visual'));
+        body.append(this._check('Collision meshes', (on) => this._setCollision(on), false, 'collision'));
+        body.append(this._check('Waypoints', (on) => window._robcoWaypointStore?.setVisible(on), true, 'waypoints'));
 
         // Scene
         body.append(title('Scene'));
         const grid = this.sm.referenceGrid || this.sm.environmentManager?.referenceGrid;
-        body.append(this._check('Reference grid', (on) => this._setGridVisible(on), grid ? grid.visible !== false : true));
+        body.append(this._check('Reference grid', (on) => this._setGridVisible(on), grid ? grid.visible !== false : true, 'grid'));
 
         // Inertia
         body.append(title('Inertia'));
-        body.append(this._check('Center of mass', (on) => this.sm.inertialVisualization?.toggleCenterOfMass(on, this._model())));
-        body.append(this._check('Inertia tensors', (on) => this.sm.inertialVisualization?.toggleInertia(on, this._model())));
+        body.append(this._check('Center of mass', (on) => this.sm.inertialVisualization?.toggleCenterOfMass(on, this._model()), false, 'com'));
+        body.append(this._check('Inertia tensors', (on) => this.sm.inertialVisualization?.toggleInertia(on, this._model()), false, 'inertia'));
 
         // Frames
         body.append(title('Frames'));
-        body.append(this._check('Link axes', (on) => on ? this.sm.axesManager?.showAllAxes() : this.sm.axesManager?.hideAllAxes()));
-        body.append(this._check('Joint axes', (on) => on ? this.sm.axesManager?.showAllJointAxes() : this.sm.axesManager?.hideAllJointAxes()));
+        body.append(this._check('Link axes', (on) => on ? this.sm.axesManager?.showAllAxes() : this.sm.axesManager?.hideAllAxes(), false, 'linkAxes'));
+        body.append(this._check('Joint axes', (on) => on ? this.sm.axesManager?.showAllJointAxes() : this.sm.axesManager?.hideAllJointAxes(), false, 'jointAxes'));
 
         // Highlight (custom hover; shows link name + mass)
         body.append(title('Highlight'));

@@ -10,9 +10,8 @@
  *
  * Static builds go through RobCoModuleAdapter; live modes go through connectLiveSession.
  */
-import { RobCoModuleAdapter } from '../adapters/RobCoModuleAdapter.js';
 import { connectLiveSession } from './liveConnect.js';
-import { applyAnglesDeg } from './poseUtils.js';
+import { buildStaticRobco } from './robcoBuild.js';
 import { loadSession, loadToken, loadCreds } from './sessionStore.js';
 
 // RobCo's public geometry CDN (Access-Control-Allow-Origin: *), no session/auth needed.
@@ -64,6 +63,26 @@ function addConnectButton(app) {
     window._robcoConnectBtn = btn;
 }
 
+// Save / Load session panel button (sits just below the Connect button). Lazy-imports the
+// panel so the session machinery is only pulled in when first opened.
+function addSessionButton(app) {
+    if (window._robcoSessionBtn) return;
+    const btn = document.createElement('button');
+    btn.textContent = '💾 Session';
+    btn.style.cssText =
+        'position:fixed;left:16px;top:52px;z-index:3000;font:600 12px ui-monospace,Menlo,Consolas,monospace;' +
+        'color:#e6edf3;background:rgba(13,17,23,0.88);border:1px solid rgba(255,255,255,0.15);' +
+        'border-radius:8px;padding:7px 12px;cursor:pointer;backdrop-filter:blur(6px);';
+    btn.addEventListener('click', async () => {
+        const { SessionPanel } = await import('./SessionPanel.js');
+        const existed = !!window._robcoSessionPanel;
+        const panel = SessionPanel.ensure(app); // first call builds it already shown
+        if (existed) panel.toggle();             // later clicks toggle visibility
+    });
+    document.body.appendChild(btn);
+    window._robcoSessionBtn = btn;
+}
+
 // Auto-reconnect the last working session on a plain reload (no ?robco= mode).
 // A still-valid saved token lets us re-derive the CURRENT session SID — the stored SID can
 // go stale when the cloud session is re-provisioned, which is why a reload would otherwise
@@ -112,7 +131,16 @@ export async function maybeLoadRobCo(app) {
     const params = new URLSearchParams(location.search);
     if (params.get('chrome') !== '1') removeOriginalChrome();
     addConnectButton(app);
+    addSessionButton(app);
     if (!params.has('robco')) {
+        // Prefer an explicitly saved workspace snapshot (full scene: robot, waypoints, tool,
+        // settings, camera). If none, fall back to reconnecting the last live RobFlow session.
+        try {
+            const { restoreLastSession } = await import('./sessionSnapshot.js');
+            if (await restoreLastSession(app)) return;
+        } catch (e) {
+            console.warn('[RobCo] session auto-restore failed:', e);
+        }
         await restoreSavedSession(app); // reconnect the last session across reloads
         return;
     }
@@ -155,55 +183,8 @@ export async function maybeLoadRobCo(app) {
         ids = parseIds(params.get('ids'), ['0001']);
     }
 
-    console.log(`[RobCo] building robot ${JSON.stringify(ids)} from ${baseUrl}`);
     try {
-        const model = await RobCoModuleAdapter.build({ baseUrl, moduleIds: ids });
-        if (anglesDeg) applyAnglesDeg(model, anglesDeg);
-        app.fileHandler.onModelLoaded(model, { name: 'robco-robot.robco' });
-        console.log(
-            `[RobCo] loaded: ${model.links.size} links, ${model.joints.size} joints`,
-            model.userData.jointOrder,
-        );
-        try {
-            const { enhanceVisuals } = await import('./enhanceVisuals.js');
-            await enhanceVisuals(model, app.sceneManager);
-        } catch (e) { console.warn('[RobCo] enhanceVisuals failed:', e); }
-
-        // Dynamics dashboard (static pose -> static gravity torques).
-        try {
-            const { DynamicsController } = await import('../dynamics/DynamicsController.js');
-            const ctrl = await DynamicsController.attach(model);
-            if (ctrl) {
-                const a = anglesDeg || (model.userData.jointOrder || []).map(() => 0);
-                ctrl.update(a, performance.now());
-                window._robcoDynamics = ctrl;
-            }
-        } catch (e) {
-            console.error('[RobCo] dynamics dashboard failed:', e);
-        }
-
-        // Teach tools panel (gizmo + IK preview). No client in static mode → preview only.
-        try {
-            const { TeachPendant } = await import('./TeachPendant.js');
-            const { RobFlowToolsPanel } = await import('./RobFlowToolsPanel.js');
-            const teach = await TeachPendant.attach(app, model);
-            window._robcoTeach = teach;
-            window._robcoPanel = new RobFlowToolsPanel(app, { teach, client: null });
-            // Dragging the gizmo -> recompute the dynamics panel for the posed arm.
-            if (teach) teach.onPose = (deg) => window._robcoDynamics?.updateStatic?.(deg);
-
-            // Waypoints (capture / list / go-to / group) — preview only without a client.
-            if (teach && window._robcoBaseFrame) {
-                const { WaypointStore } = await import('./waypointStore.js');
-                const { WaypointsPanel } = await import('./WaypointsPanel.js');
-                const store = WaypointStore.ensure(app.sceneManager, window._robcoBaseFrame);
-                WaypointsPanel.ensure({ app, teach, base: window._robcoBaseFrame, store, client: null });
-                const { EndEffector } = await import('./EndEffector.js');
-                EndEffector.ensure({ sm: app.sceneManager, model, teach, setupPanel: window._robcoSetupPanel });
-            }
-        } catch (e) {
-            console.error('[RobCo] teach tools failed:', e);
-        }
+        await buildStaticRobco(app, { baseUrl, moduleIds: ids, anglesDeg });
     } catch (err) {
         console.error('[RobCo] load failed:', err);
     }

@@ -72,6 +72,9 @@ export class EndEffector {
     // --- load / transform ----------------------------------------------
     async load(file) {
         this._status.textContent = `loading ${file.name}…`;
+        // Retain the raw GLB bytes so a session save can embed the tool (the tool is
+        // user-supplied — there's no URL to re-fetch it from on restore).
+        try { this._fileBytes = await file.arrayBuffer(); } catch { this._fileBytes = null; }
         const url = URL.createObjectURL(file);
         try {
             const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js');
@@ -103,6 +106,7 @@ export class EndEffector {
     remove() {
         if (this.toolTipIsTcp) this.teach?.setToolOffset?.(null);
         if (this.mount) { this.mount.parent?.remove(this.mount); this.mount = null; this.glb = null; }
+        this._fileBytes = null; this._fileName = null;
         window._robcoDynamics?.setPayload?.(0, [0, 0, 0]);
         if (this._body) this._body.style.display = 'none';
         if (this._status) this._status.textContent = 'no tool loaded';

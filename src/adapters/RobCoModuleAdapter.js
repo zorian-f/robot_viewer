@@ -93,7 +93,13 @@ export class RobCoModuleAdapter {
             nodes[i].setParent(nodes[i - 1]);
         }
 
-        return this.toUnifiedModel(nodes);
+        const model = this.toUnifiedModel(nodes);
+        // Stash the exact rebuild descriptor so a saved session can reconstruct this robot
+        // ({baseUrl, moduleIds}). orderedIds is the post-filter base->flange chain actually built
+        // (includes clamps), so it round-trips deterministically through chainOrder on rebuild.
+        model.userData.baseUrl = base;
+        model.userData.moduleIds = orderedIds.slice();
+        return model;
     }
 
     /**

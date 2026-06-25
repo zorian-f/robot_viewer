@@ -264,6 +264,8 @@ export class SetupPanel {
 
     async _loadScene(file) {
         this._sceneStatus.textContent = `loading ${file.name}…`;
+        // Retain the raw GLB bytes so a session save can embed the background scene.
+        try { this._sceneBytes = await file.arrayBuffer(); } catch { this._sceneBytes = null; }
         const url = URL.createObjectURL(file);
         try {
             const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js');
@@ -335,6 +337,7 @@ export class SetupPanel {
     _removeScene() {
         if (this._editing === 'scene') this._stopEdit();
         if (this.scene) { this.scene.parent?.remove(this.scene); this.scene = null; }
+        this._sceneBytes = null; this._sceneFileName = null;
         this._sceneBody.style.display = 'none';
         this._sceneStatus.textContent = 'no scene loaded';
         this.sm.redraw?.();

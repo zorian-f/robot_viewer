@@ -50,6 +50,12 @@ export class RenderSettingsPanel {
         let saved = {};
         try { saved = JSON.parse(localStorage.getItem(KEY)) || {}; } catch { /* ignore */ }
         this.s = { ...DEFAULTS, ...saved };
+        // Which environment (IBL) source is active, for session save/restore. enhanceVisuals seeds
+        // the scene with the studio env, so 'studio' is the effective default until the user loads
+        // a custom EXR/HDRI. _envBytes/_envFileName hold a custom map's raw bytes when source==='custom'.
+        this._envSource = 'studio';
+        this._envBytes = null;
+        this._envFileName = null;
         this._build();
     }
 
@@ -175,6 +181,10 @@ export class RenderSettingsPanel {
     /** Load an equirectangular HDRI (.hdr) or EXR (.exr) as scene.environment via PMREM. */
     async _loadEnvFile(file) {
         this._envStatus.textContent = `loading ${file.name}…`;
+        // Retain the raw EXR/HDR bytes + mark the source 'custom' so a session save can embed it.
+        try { this._envBytes = await file.arrayBuffer(); } catch { this._envBytes = null; }
+        this._envFileName = file.name;
+        this._envSource = 'custom';
         const url = URL.createObjectURL(file);
         try {
             const isExr = /\.exr$/i.test(file.name);
@@ -202,6 +212,9 @@ export class RenderSettingsPanel {
 
     /** Reset to the built-in procedural studio environment. */
     _applyStudioEnv() {
+        this._envSource = 'studio';
+        this._envBytes = null;
+        this._envFileName = null;
         try {
             const pmrem = new THREE.PMREMGenerator(this.sm.renderer);
             this.sm.scene.environment = pmrem.fromScene(createStudioEnvironment(), 0.04).texture;

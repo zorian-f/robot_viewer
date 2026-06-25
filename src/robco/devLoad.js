@@ -63,24 +63,12 @@ function addConnectButton(app) {
     window._robcoConnectBtn = btn;
 }
 
-// Save / Load session panel button (sits just below the Connect button). Lazy-imports the
-// panel so the session machinery is only pulled in when first opened.
-function addSessionButton(app) {
-    if (window._robcoSessionBtn) return;
-    const btn = document.createElement('button');
-    btn.textContent = '💾 Session';
-    btn.style.cssText =
-        'position:fixed;left:16px;top:52px;z-index:3000;font:600 12px ui-monospace,Menlo,Consolas,monospace;' +
-        'color:#e6edf3;background:rgba(13,17,23,0.88);border:1px solid rgba(255,255,255,0.15);' +
-        'border-radius:8px;padding:7px 12px;cursor:pointer;backdrop-filter:blur(6px);';
-    btn.addEventListener('click', async () => {
-        const { SessionPanel } = await import('./SessionPanel.js');
-        const existed = !!window._robcoSessionPanel;
-        const panel = SessionPanel.ensure(app); // first call builds it already shown
-        if (existed) panel.toggle();             // later clicks toggle visibility
-    });
-    document.body.appendChild(btn);
-    window._robcoSessionBtn = btn;
+// Save / Load session panel, shown directly under the Connect button (no launcher button —
+// the panel itself is the UI). Lazy-imports so the session machinery is only pulled in here.
+function addSessionPanel(app) {
+    import('./SessionPanel.js')
+        .then(({ SessionPanel }) => SessionPanel.ensure(app)) // builds it already shown
+        .catch((e) => console.warn('[RobCo] session panel failed to load:', e));
 }
 
 // Auto-reconnect the last working session on a plain reload (no ?robco= mode).
@@ -131,7 +119,7 @@ export async function maybeLoadRobCo(app) {
     const params = new URLSearchParams(location.search);
     if (params.get('chrome') !== '1') removeOriginalChrome();
     addConnectButton(app);
-    addSessionButton(app);
+    addSessionPanel(app);
     if (!params.has('robco')) {
         // Prefer an explicitly saved workspace snapshot (full scene: robot, waypoints, tool,
         // settings, camera). If none, fall back to reconnecting the last live RobFlow session.

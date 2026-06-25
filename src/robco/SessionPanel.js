@@ -1,7 +1,7 @@
 /**
  * Session panel — save the whole workspace to a file and load it back. Same draggable,
- * minimizable style as the View / Render / Setup panels. Opened from the "💾 Session" button
- * (devLoad.addSessionButton).
+ * minimizable style as the View / Render / Setup panels. Shown directly under the
+ * "Connect RobFlow" button (devLoad.maybeLoadRobCo); drag it anywhere or minimize with ▾.
  *
  *   Save Session   → downloads a .robcosession.json (robot recipe + waypoints + tool/scene GLBs
  *                    + camera + settings) AND records it for auto-restore on the next reload.
@@ -14,7 +14,7 @@ import {
 } from './sessionSnapshot.js';
 
 const PANEL_CSS =
-    'position:fixed;right:16px;top:16px;z-index:3000;width:230px;font:12px/1.4 ui-monospace,Menlo,Consolas,monospace;' +
+    'position:fixed;left:16px;top:56px;z-index:3000;width:230px;font:12px/1.4 ui-monospace,Menlo,Consolas,monospace;' +
     'color:#e6edf3;background:rgba(13,17,23,0.9);border:1px solid rgba(255,255,255,0.12);border-radius:10px;' +
     'padding:10px 12px;backdrop-filter:blur(6px);box-shadow:0 6px 24px rgba(0,0,0,0.4);';
 const BTN = 'width:100%;font:600 11px ui-monospace,monospace;color:#e6edf3;background:rgba(255,255,255,0.06);' +
@@ -75,7 +75,7 @@ export class SessionPanel {
         body.append(el('div', 'font-size:10px;color:#6e7681;margin:2px 0 4px;',
             'Saves the robot, waypoints, tool + scene GLBs, camera and look. Auto-restores on reload.'));
 
-        const saveBtn = el('button', BTN, '💾  Save Session');
+        const saveBtn = el('button', BTN, 'Save Session');
         saveBtn.addEventListener('click', () => this._save());
         body.append(saveBtn);
 
@@ -87,11 +87,11 @@ export class SessionPanel {
         fileInput.addEventListener('change', () => { if (fileInput.files?.[0]) this._load(fileInput.files[0]); });
         body.append(fileInput);
 
-        const loadBtn = el('button', BTN, '📂  Load Session…');
+        const loadBtn = el('button', BTN, 'Load Session…');
         loadBtn.addEventListener('click', () => fileInput.click());
         body.append(loadBtn);
 
-        this._clearBtn = el('button', BTN + 'opacity:.85;', '🗑  Clear saved session');
+        this._clearBtn = el('button', BTN + 'opacity:.85;', 'Clear saved session');
         this._clearBtn.addEventListener('click', () => this._clear());
         body.append(this._clearBtn);
 

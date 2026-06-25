@@ -72,9 +72,10 @@ export class EndEffector {
     // --- load / transform ----------------------------------------------
     async load(file) {
         this._status.textContent = `loading ${file.name}…`;
-        // Retain the raw GLB bytes so a session save can embed the tool (the tool is
-        // user-supplied — there's no URL to re-fetch it from on restore).
-        try { this._fileBytes = await file.arrayBuffer(); } catch { this._fileBytes = null; }
+        // Read the raw GLB bytes up-front so a session save can embed the tool (user-supplied —
+        // no URL to re-fetch on restore). Assigned only AFTER remove() below, which nulls them.
+        let bytes = null;
+        try { bytes = await file.arrayBuffer(); } catch { bytes = null; }
         const url = URL.createObjectURL(file);
         try {
             const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js');
@@ -87,6 +88,7 @@ export class EndEffector {
             this.glb = gltf.scene || gltf;
             this.mount.add(this.glb);
             flange.add(this.mount);
+            this._fileBytes = bytes; // set AFTER remove() above so the bytes survive the save
             this._fileName = file.name;
             this._applyCfg();
             this._refresh();

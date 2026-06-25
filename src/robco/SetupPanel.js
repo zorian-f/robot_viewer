@@ -264,8 +264,10 @@ export class SetupPanel {
 
     async _loadScene(file) {
         this._sceneStatus.textContent = `loading ${file.name}…`;
-        // Retain the raw GLB bytes so a session save can embed the background scene.
-        try { this._sceneBytes = await file.arrayBuffer(); } catch { this._sceneBytes = null; }
+        // Read the raw GLB bytes up-front so a session save can embed the background scene.
+        // Assigned only AFTER _removeScene() below, which nulls _sceneBytes/_sceneFileName.
+        let bytes = null;
+        try { bytes = await file.arrayBuffer(); } catch { bytes = null; }
         const url = URL.createObjectURL(file);
         try {
             const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js');
@@ -275,6 +277,7 @@ export class SetupPanel {
             g.name = 'robco-scene';
             this.scene = g;
             this.base.attach(g);
+            this._sceneBytes = bytes; // set AFTER _removeScene() above so the bytes survive the save
             this._sceneFileName = file.name;
             this._restoreSceneTransform();
             this._refreshScene();

@@ -24,6 +24,19 @@ function heatColor(h) {
     return '#f85149'; // red (limiting)
 }
 
+/** Utilisation as a percent label; '>100%' over the limit, '—' when unknown. */
+function fmtUtil(u) {
+    if (u == null) return '—';
+    return u > 1 ? '>100%' : `${(u * 100).toFixed(0)}%`;
+}
+
+/** Paint one utilisation bar (width clamped to 100%, colour by util, percent label). */
+function setBar(bar, pct, u) {
+    bar.style.width = u == null ? '0' : `${Math.min(100, u * 100).toFixed(0)}%`;
+    bar.style.background = utilColor(u);
+    pct.textContent = fmtUtil(u);
+}
+
 export class DynamicsDashboard {
     /**
      * @param {string[]} jointLabels - one label per joint (base->flange).
@@ -115,7 +128,7 @@ export class DynamicsDashboard {
             font: 12px/1.4 ui-monospace, Menlo, Consolas, monospace;
             color: #e6edf3; background: rgba(13,17,23,0.88);
             border: 1px solid rgba(255,255,255,0.12); border-radius: 10px;
-            padding: 10px 12px; min-width: 400px; backdrop-filter: blur(6px);
+            padding: 10px 12px; min-width: 450px; backdrop-filter: blur(6px);
             box-shadow: 0 6px 24px rgba(0,0,0,0.4);`;
 
         const title = document.createElement('div');
@@ -164,9 +177,9 @@ export class DynamicsDashboard {
 
         const head = document.createElement('div');
         head.style.cssText =
-            'display:grid;grid-template-columns:30px 48px 48px 48px 54px 48px 1fr;gap:6px;' +
+            'display:grid;grid-template-columns:28px 44px 44px 44px 50px 44px 1fr 1fr;gap:6px;' +
             'opacity:.6;margin-bottom:4px;';
-        ['', '°', '°/s', '°/s²', 'N·m', 'A', 'util'].forEach((h) => {
+        ['', '°', '°/s', '°/s²', 'N·m', 'A', 'mech', 'curr'].forEach((h) => {
             const c = document.createElement('div');
             c.textContent = h;
             c.style.textAlign = h === '' ? 'left' : 'right';
@@ -177,7 +190,7 @@ export class DynamicsDashboard {
         this.jointLabels.forEach((label, i) => {
             const row = document.createElement('div');
             row.style.cssText =
-                'display:grid;grid-template-columns:30px 48px 48px 48px 54px 48px 1fr;gap:6px;' +
+                'display:grid;grid-template-columns:28px 44px 44px 44px 50px 44px 1fr 1fr;gap:6px;' +
                 'align-items:center;padding:2px 0;';
             const cells = {};
             const mk = (key, align = 'right') => {
@@ -193,28 +206,35 @@ export class DynamicsDashboard {
             mk('acc');
             mk('torque');
             mk('current');
-            // utilization bar
-            const barWrap = document.createElement('div');
-            barWrap.style.cssText =
-                'height:12px;background:rgba(255,255,255,0.08);border-radius:6px;overflow:hidden;position:relative;';
-            const bar = document.createElement('div');
-            bar.style.cssText = 'height:100%;width:0;border-radius:6px;transition:width .08s linear;';
-            // i²t thermal underline: thin bar along the bottom = accumulated motor heat index
-            // (0..100% = the drive's current-limiting threshold). Distinct from the load bar.
-            const heat = document.createElement('div');
-            heat.style.cssText =
-                'position:absolute;left:0;bottom:0;height:3px;width:0;border-radius:2px;transition:width .15s linear;';
-            const pct = document.createElement('span');
-            pct.style.cssText =
-                'position:absolute;right:5px;top:0;line-height:12px;font-size:10px;color:#fff;';
-            barWrap.appendChild(bar);
-            barWrap.appendChild(heat);
-            barWrap.appendChild(pct);
-            row.appendChild(barWrap);
-            cells.bar = bar;
-            cells.heat = heat;
-            cells.barWrap = barWrap;
-            cells.pct = pct;
+            // Two utilisation bars: 'mech' = torque vs gearbox peak, 'curr' = motor current vs
+            // the drive limit (speed-aware). The current bar also carries the i²t thermal
+            // underline (a thin bar along the bottom, 0..100% = the drive's limiting threshold).
+            const makeBar = (withHeat) => {
+                const wrap = document.createElement('div');
+                wrap.style.cssText =
+                    'height:12px;background:rgba(255,255,255,0.08);border-radius:6px;overflow:hidden;position:relative;';
+                const bar = document.createElement('div');
+                bar.style.cssText = 'height:100%;width:0;border-radius:6px;transition:width .08s linear;';
+                wrap.appendChild(bar);
+                let heat = null;
+                if (withHeat) {
+                    heat = document.createElement('div');
+                    heat.style.cssText =
+                        'position:absolute;left:0;bottom:0;height:3px;width:0;border-radius:2px;transition:width .15s linear;';
+                    wrap.appendChild(heat);
+                }
+                const pct = document.createElement('span');
+                pct.style.cssText =
+                    'position:absolute;right:4px;top:0;line-height:12px;font-size:10px;color:#fff;';
+                wrap.appendChild(pct);
+                row.appendChild(wrap);
+                return { wrap, bar, pct, heat };
+            };
+            const mech = makeBar(false);
+            const curr = makeBar(true);
+            cells.mechBar = mech.bar; cells.mechPct = mech.pct; cells.mechWrap = mech.wrap;
+            cells.currBar = curr.bar; cells.currPct = curr.pct; cells.currWrap = curr.wrap;
+            cells.heat = curr.heat;
             cells.title = label;
             row.title = label;
 
@@ -328,24 +348,22 @@ export class DynamicsDashboard {
             r.torque.textContent = (torque?.[i] ?? 0).toFixed(1);
             const iq = current?.[i];
             r.current.textContent = iq == null ? '—' : iq.toFixed(1);
-            // The bar shows the binding constraint: torque (mechanical/gearbox) and current
-            // (electrical/thermal) are different ceilings — whichever is higher is the limit.
+            // Two independent bars: mechanical (torque vs gearbox peak) and current (electrical,
+            // speed-aware vs the drive limit). They are different ceilings, shown side by side.
             const ut = utilization?.[i];
             const uc = currentUtil?.[i];
-            const u = ut == null && uc == null ? null : Math.max(ut ?? 0, uc ?? 0);
-            const binds = uc != null && (ut == null || uc > ut) ? 'I' : 'τ';
-            const uLabel = u == null ? '—' : (u > 1 ? `>100% ${binds}` : `${(u * 100).toFixed(0)}% ${binds}`);
-            r.bar.style.width = u == null ? '0' : `${Math.min(100, u * 100).toFixed(0)}%`;
-            r.bar.style.background = utilColor(u);
-            r.pct.textContent = uLabel;
-            // i²t thermal underline (heat is a %; 100 = limiting threshold).
+            setBar(r.mechBar, r.mechPct, ut);
+            setBar(r.currBar, r.currPct, uc);
+            if (r.mechWrap) r.mechWrap.title = `${r.title} — torque (mechanical) ${fmtUtil(ut)}`;
+            // i²t thermal underline under the current bar (heat is a %; 100 = limiting threshold).
             const h = heat?.[i];
-            r.heat.style.width = h == null ? '0' : `${Math.min(100, h).toFixed(0)}%`;
-            r.heat.style.background = heatColor(h);
-            if (r.barWrap) {
-                r.barWrap.title = h == null
-                    ? r.title
-                    : `${r.title} — load ${uLabel}, i²t heat ${h.toFixed(0)}%`;
+            if (r.heat) {
+                r.heat.style.width = h == null ? '0' : `${Math.min(100, h).toFixed(0)}%`;
+                r.heat.style.background = heatColor(h);
+            }
+            if (r.currWrap) {
+                r.currWrap.title = `${r.title} — current (electrical) ${fmtUtil(uc)}`
+                    + (h == null ? '' : `, i²t heat ${h.toFixed(0)}%`);
             }
         }
     }

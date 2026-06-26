@@ -34,7 +34,11 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 24
+          # Pinned to 24.16.0: Node 24.17.0's bundled undici regressed keep-alive connections to
+          # googleapis, causing "Premature close" on the Firebase deploy's OAuth token fetch and
+          # release calls (red CI despite a working deploy). 24.16.0 is the last good runner Node.
+          # Revisit (back to `24`) once a Node 24.x ships with the undici fix.
+          node-version: 24.16.0
           cache: pnpm
 
       - name: Install dependencies
@@ -56,11 +60,3 @@ jobs:
           projectId: orrerium
           channelId: ${{ github.ref_name == 'main' && 'live' || github.ref_name }}
           expires: 30d
-          # firebase-tools pin (upstream is in a bad window):
-          #   15.22.2 — its resolved gaxios fails the OAuth token fetch ("Premature close") so it
-          #             can't even authenticate.
-          #   15.22.3 — authenticates, but its `hosting:channel:deploy` re-releases within the same
-          #             command and errors "current active version" (deploy still succeeds).
-          # Testing 15.22.3 to confirm it still authenticates; if so we'll tolerate the benign
-          # re-release error. Revisit once a clean release ships.
-          firebaseToolsVersion: "15.22.3"

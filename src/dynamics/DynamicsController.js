@@ -23,6 +23,18 @@ const MARKER_STYLE = {
     robot: { color: 0x238636 },
 };
 
+/** Element-wise equality for two optional 3×3 inertia tensors (both null counts as equal). */
+function inertiaEqual(a, b) {
+    if (!a && !b) return true;
+    if (!a || !b) return false;
+    for (let i = 0; i < 3; i++) {
+        for (let j = 0; j < 3; j++) {
+            if (a[i]?.[j] !== b[i]?.[j]) return false;
+        }
+    }
+    return true;
+}
+
 export class DynamicsController {
     /**
      * @param {import('../models/UnifiedRobotModel.js').UnifiedRobotModel} model
@@ -75,6 +87,7 @@ export class DynamicsController {
         this._payloads = new Map();
         this._markers = new Map();
         this._flange = null;
+        this._robotPayloadInfo = null; // last RobFlow-reported payload (for the panel status line)
     }
 
     /**
@@ -143,21 +156,54 @@ export class DynamicsController {
      * @param {number} mass - kg
      * @param {number[]} com - flange-frame CoM (m)
      */
-    setPayloadSource(source, mass, com = [0, 0, 0]) {
+    setPayloadSource(source, mass, com = [0, 0, 0], inertia = null) {
         if (mass > 0) {
-            // Skip a redundant full MuJoCo model rebuild + recompute when nothing changed.
+            // Skip a redundant full MuJoCo model rebuild + recompute when nothing changed —
+            // including the inertia-tensor case (deep-compared), so a live payload re-pushed at
+            // stream rate doesn't recompile the WASM model every frame.
             const prev = this._payloads.get(source);
             if (prev && prev.mass === mass
-                && prev.com[0] === com[0] && prev.com[1] === com[1] && prev.com[2] === com[2]) return;
-            this._payloads.set(source, { mass, com: com.slice() });
+                && prev.com[0] === com[0] && prev.com[1] === com[1] && prev.com[2] === com[2]
+                && inertiaEqual(prev.inertia, inertia)) {
+                return prev.inertiaApplied || false;
+            }
+            this._payloads.set(source, { mass, com: com.slice(), inertia: inertia || null, inertiaApplied: false });
         } else {
-            if (!this._payloads.has(source)) return; // clearing a source that was never set
+            if (!this._payloads.has(source)) return false; // clearing a source that was never set
             this._payloads.delete(source);
         }
-        this.dyn.setPayloads([...this._payloads.values()]); // rebuilds with all loads at the flange
+        // setPayloads returns whether MuJoCo accepted the inertia tensor(s); record the real
+        // outcome on the just-set source so the panel can report it honestly.
+        const inertiaKept = this.dyn.setPayloads([...this._payloads.values()]);
+        const entry = this._payloads.get(source);
+        if (entry) entry.inertiaApplied = !!(entry.inertia && inertiaKept);
         this._updateMarkers();
+        this.dash?.setPayloadSummary?.(
+            [...this._payloads.entries()].map(([s, p]) => ({ source: s, mass: p.mass })),
+        );
         // Recompute immediately so the change shows even when idle (static pose).
         if (this._lastAngles) this.update(this._lastAngles, performance.now());
+        return entry ? entry.inertiaApplied : false;
+    }
+
+    /**
+     * Apply a RobFlow-reported payload as the 'robot' source and reflect it in the panel status.
+     * The caller passes already unit-normalized values (kg, m, kg·m²); a falsy/zero-mass info
+     * clears the source. The inertia tensor is handed to MuJoCo, which is the authority on whether
+     * it's physical — the reported `inertiaApplied` reflects MuJoCo's actual outcome, not a guess.
+     * @param {{mass:number, com:number[], inertia?:number[][]|null, via?:string,
+     *   tool?:string|null}|null} info
+     */
+    applyRobotPayload(info) {
+        if (!info || !(info.mass > 0)) {
+            this.setPayloadSource('robot', 0);
+            this._robotPayloadInfo = null;
+            this.dash?.setRobotPayloadInfo?.(null);
+            return;
+        }
+        const inertiaApplied = this.setPayloadSource('robot', info.mass, info.com || [0, 0, 0], info.inertia || null);
+        this._robotPayloadInfo = { ...info, inertiaApplied };
+        this.dash?.setRobotPayloadInfo?.(this._robotPayloadInfo);
     }
 
     /** Resolve & cache the flange so payload markers can be parented to it on demand. */

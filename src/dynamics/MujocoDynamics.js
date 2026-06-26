@@ -89,29 +89,52 @@ export class MujocoDynamics {
         this.motorModel = !!on;
     }
 
-    /** Rebuild the MuJoCo model (e.g. after a payload or gravity change). Options merge. */
+    /**
+     * Rebuild the MuJoCo model (e.g. after a payload or gravity change). Options merge.
+     * Transactional: the new model is compiled BEFORE the old one is torn down, so a load
+     * failure (e.g. a non-physical payload inertia) leaves the previous working model + `_opts`
+     * intact and the error propagates to the caller.
+     */
     rebuild(opts = {}) {
-        this._opts = { ...this._opts, ...opts };
-        const { xml, jointNames } = mjcfFromModules(this.descriptors, this._opts);
-        this.jointNames = jointNames;
-        this.nq = jointNames.length;
+        const merged = { ...this._opts, ...opts };
+        const { xml, jointNames } = mjcfFromModules(this.descriptors, merged);
         const path = '/working/robco_dyn.xml';
         this.mj.FS.writeFile(path, xml);
-        this._dispose();
-        this.model = this.mj.MjModel.loadFromXML(path);
-        this.data = new this.mj.MjData(this.model);
+        const model = this.mj.MjModel.loadFromXML(path); // may throw — old model still valid here
+        const data = new this.mj.MjData(model);
+        this._dispose(); // commit: only now do we drop the previous model/data
+        this._opts = merged;
+        this.jointNames = jointNames;
+        this.nq = jointNames.length;
+        this.model = model;
+        this.data = data;
     }
 
     /**
      * Replace all TCP payloads and rebuild. Each entry is welded as its own body at its CoM
-     * (flange frame, m), so MuJoCo sums their gravity + inertial torques exactly.
-     * @param {Array<{mass:number, com:number[]}>} payloads
+     * (flange frame, m), so MuJoCo sums their gravity + inertial torques exactly. An entry may
+     * carry an optional 3×3 inertia tensor (kg·m², about its CoM).
+     * @param {Array<{mass:number, com:number[], inertia?:number[][]|null}>} payloads
+     * @returns {boolean} whether the inertia tensors were accepted (false if any was present but
+     *   MuJoCo rejected the model, forcing the point-mass fallback — lets callers report honestly).
      */
     setPayloads(payloads) {
         const list = (Array.isArray(payloads) ? payloads : []).filter((p) => p?.mass > 0);
+        const hasInertia = list.some((p) => p.inertia);
         // Clear the legacy single-payload keys so a stale value can't leak through on the next
         // rebuild — `payloads` is now the single source of truth for the load at the flange.
-        this.rebuild({ payloads: list, payloadMass: 0, payloadCom: [0, 0, 0] });
+        try {
+            this.rebuild({ payloads: list, payloadMass: 0, payloadCom: [0, 0, 0] });
+            return hasInertia; // tensors (if any) were accepted by MuJoCo
+        } catch (e) {
+            // A payload inertia tensor MuJoCo deems non-physical must not break the whole model:
+            // retry with point masses (drop the tensors) so gravity/CoM torque still applies. The
+            // transactional rebuild above means the previous model is still live if this also fails.
+            console.warn('[RobCo] payload rebuild failed; retrying as point masses:', e?.message || e);
+            const pointMasses = list.map(({ mass, com }) => ({ mass, com }));
+            this.rebuild({ payloads: pointMasses, payloadMass: 0, payloadCom: [0, 0, 0] });
+            return false; // fell back to point masses
+        }
     }
 
     /**

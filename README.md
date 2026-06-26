@@ -55,10 +55,12 @@ your models never leave your device.
   friction + reflected rotor inertia) so the numbers reflect a real geared joint rather than
   an idealized rigid body. A toggle switches between the two; a velocity/acceleration
   estimator with an optional fixed-Δt smoothing interval feeds it.
-- Editable **TCP payload(s)** (mass + center-of-mass offset) — a manual TCP load and an
-  imported gripper tool coexist and are **summed**, each shown as its own marker sphere at its
-  CoM — plus **base-orientation-aware gravity** (wall/ceiling mounts); all reflected in the
-  torque, current and utilization.
+- Editable **TCP payload(s)** (mass + center-of-mass offset) — a manual TCP load, an imported
+  gripper tool, and the **live RobFlow-reported payload** coexist and are **summed**, each shown
+  as its own marker sphere at its CoM — plus **base-orientation-aware gravity** (wall/ceiling
+  mounts); all reflected in the torque, current and utilization. In a live session the dynamics
+  panel shows what payload RobFlow reports (mass, CoM, and whether a full inertia tensor was
+  received via `payloadInertialParameters`) and that it is being applied.
 - See [How joint dynamics are computed](#how-joint-dynamics-are-computed) for the exact model.
 
 ### Cell setup

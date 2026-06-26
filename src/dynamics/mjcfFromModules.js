@@ -65,8 +65,10 @@ function inertialXml(mass, inertia, com) {
 /**
  * @param {Object[]} descriptors - per-module JSON descriptors, base->flange (clamps included).
  * @param {Object} [opts]
- * @param {Array<{mass:number, com:number[]}>} [opts.payloads] - TCP payloads (kg + CoM in the
- *   flange frame, m); each is welded as its own body so several loads sum correctly.
+ * @param {Array<{mass:number, com:number[], inertia?:number[][]|null}>} [opts.payloads] - TCP
+ *   payloads (kg + CoM in the flange frame, m). Each is welded as its own body so several loads
+ *   sum correctly. `inertia` (optional) is a 3×3 symmetric tensor (kg·m²) about that payload's
+ *   CoM — when given MuJoCo uses the real rotational inertia, otherwise it's a point mass.
  * @param {number} [opts.payloadMass=0] - legacy single-payload mass (kg); used only when
  *   `payloads` is not given.
  * @param {number[]} [opts.payloadCom=[0,0,0]] - legacy single-payload CoM in the flange frame (m).
@@ -91,7 +93,7 @@ export function mjcfFromModules(descriptors, opts = {}) {
     }
     payloads.forEach((p, i) => {
         if (!(p?.mass > 0)) return;
-        inner += `<body name="payload_${i}">${inertialXml(p.mass, null, p.com ?? [0, 0, 0])}</body>`;
+        inner += `<body name="payload_${i}">${inertialXml(p.mass, p.inertia ?? null, p.com ?? [0, 0, 0])}</body>`;
     });
 
     for (let i = descriptors.length - 1; i >= 0; i--) {

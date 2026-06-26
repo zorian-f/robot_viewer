@@ -56,6 +56,7 @@ export class DynamicsDashboard {
         const pay = DynamicsDashboard._loadPayload();
         this._payloadKg = pay.kg;
         this._payloadCom = pay.com; // CoM offset from the flange/TCP, in mm
+        this._robotPayloadSeen = false; // have we ever heard a payload from RobFlow this session?
         this._build(parent);
     }
 
@@ -66,6 +67,58 @@ export class DynamicsDashboard {
     /** CoM offset converted to metres (what the dynamics payload API expects). */
     getPayloadComMeters() {
         return this._payloadCom.map((v) => v / 1000);
+    }
+
+    /**
+     * Render the "what we use" line: the combined payload across all sources.
+     * @param {Array<{source:string, mass:number}>} entries
+     */
+    setPayloadSummary(entries) {
+        const el = this._payloadSummaryEl;
+        if (!el) return;
+        const NAMES = { tcp: 'TCP', gripper: 'gripper', robot: 'RobFlow' };
+        const active = (entries || []).filter((e) => e.mass > 0);
+        if (active.length < 2) { el.style.display = 'none'; return; } // a single source is self-evident
+        const total = active.reduce((s, e) => s + e.mass, 0);
+        const parts = active.map((e) => `${NAMES[e.source] || e.source} ${e.mass.toFixed(2)}`);
+        el.textContent = `payloads: ${parts.join(' + ')} = ${total.toFixed(2)} kg`;
+        el.style.display = 'block';
+    }
+
+    /**
+     * Render the "what we receive from RobFlow" line: the live robot-reported payload, which feed
+     * it came from, and whether the inertia tensor was usable. Pass null to clear (shows "none"
+     * once RobFlow has been heard from at least once).
+     * @param {{mass:number, com:number[], via?:string, inertia?:number[][]|null,
+     *   inertiaApplied?:boolean, tool?:string|null}|null} info
+     */
+    setRobotPayloadInfo(info) {
+        const el = this._robotPayloadEl;
+        if (!el) return;
+        if (!info || !(info.mass > 0)) {
+            if (this._robotPayloadSeen) {
+                el.innerHTML = '<span style="color:#238636;">●</span> '
+                    + '<span style="opacity:.6;">RobFlow payload: none reported (0 kg)</span>';
+                el.style.display = 'block';
+            } else {
+                el.style.display = 'none';
+            }
+            return;
+        }
+        this._robotPayloadSeen = true;
+        const com = (info.com || [0, 0, 0]).map((v) => Math.round(v * 1000)); // m -> mm for display
+        const inertia = info.inertiaApplied
+            ? 'inertia ✓'
+            : (info.inertia ? 'inertia ✗ ignored' : 'point mass');
+        // The tool name is backend-supplied → escape before it goes into innerHTML.
+        const esc = (s) => String(s).replace(/[&<>"]/g, (c) => (
+            { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+        const tool = info.tool ? ` · tool “${esc(info.tool)}”` : '';
+        el.innerHTML =
+            `<span style="color:#238636;">●</span> <span style="color:#e6edf3;">RobFlow payload</span> `
+            + `<span style="opacity:.85;">${info.mass.toFixed(2)} kg @ [${com.join(', ')}] mm · ${inertia}${tool}</span>`
+            + `<br><span style="opacity:.5;">received via ${info.via || 'payload'} · applied to torque</span>`;
+        el.style.display = 'block';
     }
 
     static _loadPayload() {
@@ -170,10 +223,19 @@ export class DynamicsDashboard {
         el.appendChild(massRow);
 
         const comRow = document.createElement('div');
-        comRow.style.cssText = 'display:flex;align-items:center;gap:4px;margin-bottom:8px;font-size:11px;';
+        comRow.style.cssText = 'display:flex;align-items:center;gap:4px;margin-bottom:6px;font-size:11px;';
         const comLbl = document.createElement('span'); comLbl.textContent = 'CoM'; comLbl.style.cssText = 'opacity:.8;margin-right:2px;';
         comRow.append(comLbl, dim('x'), cx, dim('y'), cy, dim('z'), cz, dim('mm'));
         el.appendChild(comRow);
+
+        // "What we use": combined payload across all sources (TCP + gripper + RobFlow).
+        this._payloadSummaryEl = document.createElement('div');
+        this._payloadSummaryEl.style.cssText = 'font-size:10px;color:#9da7b3;margin:-2px 0 4px;display:none;';
+        el.appendChild(this._payloadSummaryEl);
+        // "What we receive": the live RobFlow-reported payload + how we apply it.
+        this._robotPayloadEl = document.createElement('div');
+        this._robotPayloadEl.style.cssText = 'font-size:10px;margin:0 0 8px;display:none;line-height:1.55;';
+        el.appendChild(this._robotPayloadEl);
 
         const head = document.createElement('div');
         head.style.cssText =

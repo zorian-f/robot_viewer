@@ -60,8 +60,47 @@ export async function connectLiveSession(app, opts) {
     let latestBaseShift = null;
     let dynamics = null;
     let teach = null;
-    let pendingPayload = null;
     let firstJa = true;
+
+    // --- RobFlow-reported payload --------------------------------------------------------------
+    // RobFlow can report the payload three ways; we feed the richest available into the dynamics
+    // as the 'robot' source and surface it in the panel. Wire units: mass kg, CoM mm, inertia
+    // kg·m² (about the CoM, end-flange frame). CoM is converted mm -> m here (the dynamics is SI).
+    let rfPayload = null;     // from the `payload` message (mass + CoM)
+    let rfInertial = null;    // from `payloadInertialParameters` (mass + CoM + tensor)
+    let rfPayloadAt = 0;      // arrival time (perf clock) of each feed, for recency tie-breaking
+    let rfInertialAt = 0;
+    let rfTools = null;       // robot-config tool library (to name the active tool)
+    let rfToolsFromWs = false; // a live robotConfig push wins over the one-shot REST fetch
+    let rfActiveToolUuid = null;
+    let rfActiveToolName = null;
+    let pendingRobotPayload = null; // buffered until the dynamics controller exists
+    let havePendingRobot = false;
+
+    const num = (v) => (Number.isFinite(+v) ? +v : 0);
+    const mm2m = (v) => num(v) / 1000;
+    const com3 = (raw) => (Array.isArray(raw)
+        ? [mm2m(raw[0]), mm2m(raw[1]), mm2m(raw[2])]
+        : [mm2m(raw?.x), mm2m(raw?.y), mm2m(raw?.z)]);
+    const rfResolveActiveTool = () => {
+        rfActiveToolName = (rfTools || []).find((x) => x?.uuid === rfActiveToolUuid)?.name || null;
+    };
+    const rfResolvePayload = () => {
+        const inOk = rfInertial && rfInertial.mass > 0;
+        const plOk = rfPayload && rfPayload.mass > 0;
+        // Both feeds live: prefer the richer inertial feed unless the plain payload is strictly
+        // newer (robot switched to reporting only `payload`) — that un-sticks a stale tensor.
+        if (inOk && plOk) return { ...(rfInertialAt >= rfPayloadAt ? rfInertial : rfPayload) };
+        if (inOk) return { ...rfInertial };
+        if (plOk) return { ...rfPayload };
+        return null;
+    };
+    const rfApply = () => {
+        const info = rfResolvePayload();
+        if (info && rfActiveToolName) info.tool = rfActiveToolName;
+        if (dynamics) dynamics.applyRobotPayload(info);
+        else { pendingRobotPayload = info; havePendingRobot = true; }
+    };
 
     socket.on('robotModuleIds', async (ids) => {
         if (model || building) return; // build once; rebuild-on-change can come later
@@ -89,9 +128,7 @@ export async function connectLiveSession(app, opts) {
             try {
                 dynamics = await DynamicsController.attach(model);
                 window._robcoDynamics = dynamics; // used by View-panel sliders + end-effector payload
-                if (dynamics && pendingPayload) {
-                    dynamics.setPayloadSource('robot', pendingPayload.mass, pendingPayload.com);
-                }
+                if (dynamics && havePendingRobot) dynamics.applyRobotPayload(pendingRobotPayload);
                 if (dynamics && latestAngles) dynamics.update(latestAngles, performance.now());
             } catch (e) {
                 console.error('[RobCo] dynamics dashboard failed:', e);
@@ -145,23 +182,40 @@ export async function connectLiveSession(app, opts) {
         app.sceneManager?.redraw();
     });
 
+    // RobFlow-reported payload — independent of the user's manual TCP load and imported gripper
+    // (its own 'robot' source). Three feeds; rfApply() picks the richest and pushes it to the
+    // dynamics + panel. CoM is normalized + converted mm -> m via com3(); never trust the shape.
     socket.on('payload', (p) => {
-        // The robot-reported payload is its own 'robot' source, independent of the user's manual
-        // TCP load and any imported gripper. Only apply a real payload (mass > 0); a zero/absent
-        // one would just clear the 'robot' source, but we skip it so a momentary absence doesn't
-        // flicker the load off.
-        const mass = Number.isFinite(+p?.mass) ? +p.mass : 0;
-        if (!(mass > 0)) return;
-        // RobFlow payload: mass (kg) + centerOfMass (flange frame, m). Never trust the wire shape
-        // — normalize CoM to exactly three finite numbers (array, {x,y,z}, short or NaN all happen)
-        // before it reaches the MJCF, which would otherwise reject the model.
-        const raw = p.centerOfMass;
-        const com = Array.isArray(raw)
-            ? [0, 1, 2].map((i) => (Number.isFinite(+raw[i]) ? +raw[i] : 0))
-            : [Number(raw?.x) || 0, Number(raw?.y) || 0, Number(raw?.z) || 0];
-        if (dynamics) dynamics.setPayloadSource('robot', mass, com);
-        else pendingPayload = { mass, com };
+        const mass = num(p?.mass);
+        rfPayload = mass > 0 ? { mass, com: com3(p?.centerOfMass), via: 'payload' } : null;
+        rfPayloadAt = performance.now();
+        rfApply();
     });
+    socket.on('payloadInertialParameters', (p) => {
+        const mass = num(p?.mass);
+        if (mass > 0) {
+            // Symmetric 3×3 about the CoM, end-flange frame (kg·m²).
+            const inertia = [
+                [num(p.ixx), num(p.ixy), num(p.ixz)],
+                [num(p.ixy), num(p.iyy), num(p.iyz)],
+                [num(p.ixz), num(p.iyz), num(p.izz)],
+            ];
+            rfInertial = { mass, com: com3(p?.centerOfMass), inertia, via: 'payloadInertialParameters' };
+        } else {
+            rfInertial = null;
+        }
+        rfInertialAt = performance.now();
+        rfApply();
+    });
+    socket.on('robotConfig', (cfg) => { rfTools = cfg?.tools || []; rfToolsFromWs = true; rfResolveActiveTool(); rfApply(); });
+    socket.on('tool', (t) => { rfActiveToolUuid = t?.toolUuid || null; rfResolveActiveTool(); rfApply(); });
+
+    // Pull the configured tool library once up-front so the active tool can be named in the status
+    // even before a `robotConfig` push arrives. Read-only; non-fatal if it fails. A live
+    // `robotConfig` push is authoritative, so don't let this late REST result clobber it.
+    client.getRobotConfig()
+        .then((cfg) => { if (!rfToolsFromWs) { rfTools = cfg?.tools || []; rfResolveActiveTool(); rfApply(); } })
+        .catch(() => { /* also delivered via the robotConfig WS message */ });
 
     socket.on('robotState', (d) => panel.setStates({ robotState: d }));
     socket.on('operationMode', (d) => panel.setStates({ operationMode: d }));

@@ -56,8 +56,11 @@ jobs:
           projectId: orrerium
           channelId: ${{ github.ref_name == 'main' && 'live' || github.ref_name }}
           expires: 30d
-          # Pin firebase-tools: 15.22.3 regressed `hosting:channel:deploy` — it re-attempts the
-          # release within the same command and fails with HTTP 400 "supplied version is the
-          # current active version" even though the deploy succeeded (red CI on a working deploy).
-          # 15.22.2 is the last known-good. Revisit once a fixed release ships.
-          firebaseToolsVersion: "15.22.2"
+          # firebase-tools pin (upstream is in a bad window):
+          #   15.22.2 — its resolved gaxios fails the OAuth token fetch ("Premature close") so it
+          #             can't even authenticate.
+          #   15.22.3 — authenticates, but its `hosting:channel:deploy` re-releases within the same
+          #             command and errors "current active version" (deploy still succeeds).
+          # Testing 15.22.3 to confirm it still authenticates; if so we'll tolerate the benign
+          # re-release error. Revisit once a clean release ships.
+          firebaseToolsVersion: "15.22.3"

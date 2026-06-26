@@ -190,9 +190,32 @@ export class RobFlowClient {
         return this._put(`/flows/${uuid}/run`);
     }
 
-    /** GET /flows/ — list flows. */
+    /** GET /flows/ — list flows (full Flow objects: uuid, name, nodes, edges, settings; no variables). */
     listFlows() {
         return this._get('/flows/');
+    }
+
+    /** GET /flows/{uuid} — a flow's graph (nodes/edges/settings; no variables). */
+    getFlow(uuid) {
+        return this._get(`/flows/${uuid}`);
+    }
+
+    /**
+     * GET /flows/{uuid}/export — the full importable flow incl. variables[]. Use this to LOAD a
+     * flow: it's the only read endpoint that bundles nodes + edges + the pose variables together,
+     * so variable-bound movement poses can be resolved.
+     */
+    getExportableFlow(uuid) {
+        return this._get(`/flows/${uuid}/export`);
+    }
+
+    /**
+     * PATCH /flows/{uuid} — partial in-place graph update (PartialFlow: nodes/edges/groups/
+     * settings/name; required field is only uuid). Used to round-trip edits back to a loaded flow
+     * without re-importing. 404 if the flow no longer exists (e.g. a reset cloud session).
+     */
+    patchFlow(uuid, partial) {
+        return this._patch(`/flows/${uuid}`, { uuid, ...partial });
     }
 
     /** POST /variables — create one variable (HTTP 409 if the name already exists). */

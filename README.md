@@ -74,9 +74,14 @@ your models never leave your device.
 ### Teach & waypoints
 - A **teach pendant**: gizmo-driven posing with gated *Send* (velocity / acceleration /
   approach) and *Stop* controls.
-- **Waypoints** — capture / list / go-to / group teach poses. Each waypoint stores a
-  world-frame TCP pose (so it stays put when the base moves) plus a joint snapshot; a
-  multi-seed reachability retry avoids false "unreachable" results after large base moves.
+- **Waypoints & flow round-trip** — an ordered sequence editor that pulls a RobFlow flow
+  (load any flow → its joint/cartesian moves, delays and payloads appear as markers + rows in
+  execution order) and pushes it back with inline poses (update-in-place via PATCH). Per row:
+  switch joint↔cartesian (colour-coded), set velocity / acceleration / blending; insert **delay**
+  and **payload** steps; drag to reorder. Consecutive same-mode moves export as one node; a
+  delay/payload/mode-change starts a new node; the body loops with a cycle-time marker. Each
+  waypoint stores a world-frame TCP pose (so it stays put when the base moves) plus a joint
+  snapshot; a multi-seed reachability retry avoids false "unreachable" results after base moves.
 
 ### Rendering
 - ACES / Neutral tone mapping with image-based lighting for a clean, metallic look.

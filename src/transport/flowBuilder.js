@@ -1,12 +1,15 @@
 /**
- * Build a RobFlow v7.0.0 flow from captured joint waypoints.
+ * Build a RobFlow flow from an ordered viewer waypoint sequence (moves + delays + payloads).
  *
- * Port of RobFlowLink's flow builder: start → jointMovement(s) → stop, with VueFlow edges
- * (`vueflow__edge-{src}out-{tgt}in`). Proven to import + run against the RobCo backend.
+ * Inverse of flowParser.parseFlow. Poses are written INLINE (variables: []) so the flow round-trips
+ * cleanly and can be PATCHed in place. Consecutive moves of the same mode collapse into ONE
+ * movement node holding every pose in `movements[]`; a mode change, a delay, or a payload starts a
+ * new node. The whole body is wrapped in an infinite loop, with a messageLog cycle marker at the end
+ * so the CycleTimer can measure loop time.
  *
- * merged=true : one jointMovement node whose `movements[]` holds every pose (compact).
- * merged=false: one jointMovement node per pose, chained (visible sequence in the editor).
- * Angles are in DEGREES; velocity/acceleration are 0..1 fractions.
+ * Units (matching the sequence model): joints deg, cartesian position mm + orientation deg, velocity
+ * & acceleration 0..1 fractions, blendingRadius mm, delay seconds, payload mass kg + CoM mm
+ * (converted to metres for the flow node, per the backend Payload model).
  */
 const uuid = () =>
     (crypto.randomUUID
@@ -16,40 +19,10 @@ const uuid = () =>
               return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
           }));
 
-function makeMovement(anglesDeg, velocity, acceleration, name = '') {
-    return {
-        name,
-        pose: { jointAngles: anglesDeg },
-        uuid: uuid(),
-        valid: true,
-        velocity,
-        acceleration,
-        approachMode: 1,
-        blendingRadius: 0,
-    };
-}
+const clamp01 = (v) => Math.max(0, Math.min(1, Number.isFinite(+v) ? +v : 0));
+const num = (v, d = 0) => (Number.isFinite(+v) ? +v : d);
 
-function makeJointNode(id, label, repAngles, movements, velocity, acceleration, x) {
-    return {
-        id,
-        type: 'jointMovement',
-        parentNode: null,
-        data: {
-            name: label,
-            pose: { jointAngles_: repAngles, poseVariableId: null, variableIndex_: null },
-            valid: true,
-            canBeSaved: true,
-            validStates: { general: true },
-            velocity,
-            acceleration,
-            approachMode: 1,
-            blendingRadius: 0,
-            movements,
-        },
-        position: { x, y: 0 },
-    };
-}
-
+// VueFlow edge: target always connects to the implicit "in" handle; source leaves via `handle`.
 const edge = (src, tgt, handle = 'out') => ({
     id: `vueflow__edge-${src}${handle}-${tgt}in`,
     source: src,
@@ -57,271 +30,143 @@ const edge = (src, tgt, handle = 'out') => ({
     target: tgt,
 });
 
-/** Infinite loop entry node — its "loop" handle runs the body each iteration, forever. */
-function loopNode(id, x) {
-    return {
-        id,
-        type: 'loop',
-        parentNode: null,
-        data: {
-            name: '',
-            valid: true,
-            infinite: true,
-            canBeSaved: true,
-            iterations: { dtype: 'integer', expressionRaw: '1', expressionProcessed: '1' },
-        },
-        position: { x, y: 0 },
-    };
-}
-
-// Stamped on every variable we create so they're trivial to find & bulk-clean in RobFlow.
-const ORRERIUM_TAG = { name: 'orrerium', color: '#8ACED8' };
-
-// Logged once per loop iteration via a messageLog node at the end of the body. The cycle-time
-// reader (CycleTimer) matches message-log entries on this exact text to time the full loop.
+/** Logged once per loop iteration; CycleTimer matches this exact text to time the full loop. */
 export const CYCLE_MARKER = 'orrerium-cycle';
 
-/** messageLog node — fires each loop pass; its log entry (server-timestamped) marks a cycle. */
-function messageLogNode(id, x) {
+function startNode() {
+    return { id: 'start', type: 'start', parentNode: null, data: { valid: true, validStates: { general: true } }, position: { x: 0, y: 0 } };
+}
+
+/** Infinite loop entry — its "loop" handle drives the body each iteration, forever. */
+function loopNode(id, x) {
     return {
-        id,
-        type: 'messageLog',
-        parentNode: null,
-        data: {
-            name: '',
-            valid: true,
-            // StringExpression is a literal template — plain text, no quoting needed.
-            message: { dtype: 'string', expressionRaw: CYCLE_MARKER, expressionProcessed: CYCLE_MARKER },
-            logLevel: 'info',
-            canBeSaved: true,
-        },
+        id, type: 'loop', parentNode: null,
+        data: { name: '', valid: true, infinite: true, canBeSaved: true, iterations: { dtype: 'integer', expressionRaw: '1', expressionProcessed: '1' } },
         position: { x, y: 0 },
     };
 }
 
-// ---- Variable-bound waypoint flow (Phase 4) --------------------------------
-// RobFlow variable types: jointPose (jointAngles[] deg) / cartesianPose (position xyz mm +
-// orientation rx,ry,rz EULER deg). One variable per waypoint (no array type). A movement binds
-// to its variable via pose.poseVariableId; the literal pose stays as a fallback. Grouped
-// waypoints become ONE movement node with movements[]; ungrouped become one node each.
-
-function protocolConfigs() {
+function messageLogNode(id, x) {
     return {
-        modbus: { enabled: false, dataType: '', readonly: false, bitAddress: 0, connectionId: null, updateFromModbus: false },
-        profinet: { enabled: false, offsetPosition: 0, byteLength: 0, omitPlcUpdate: false },
+        id, type: 'messageLog', parentNode: null,
+        data: { name: '', valid: true, message: { dtype: 'string', expressionRaw: CYCLE_MARKER, expressionProcessed: CYCLE_MARKER }, logLevel: 'info', canBeSaved: true },
+        position: { x, y: 0 },
     };
 }
 
-/**
- * The pose value stored in a jointPose / cartesianPose variable (and patched on override).
- * cartesian: position xyz mm + orientation rx,ry,rz EULER deg. joint: jointAngles[] deg.
- * @returns {object} a fresh value object (never mutates `it`).
- */
-export function poseValue(mode, it) {
-    return mode === 'cartesian'
-        ? { poseVariableId: null, position: it.position, orientation: it.orientation }
-        : { poseVariableId: null, jointAngles: it.joints };
-}
-
-/** EximJointPoseVariable / EximCartesianPoseVariable for a waypoint. */
-function poseVariable(mode, name, varUuid, it) {
-    const common = {
-        conflictAction: null, name, description: '', uuid: varUuid,
-        persistent: true, readonly: false, tags: [{ ...ORRERIUM_TAG }], syncToStudio: false,
-        version: 'v7.1.7', problematic: false, protocolConfigs: protocolConfigs(),
+/** One inline movement inside a movement node. */
+function movementInline(mode, m) {
+    const mv = {
+        name: m.name || '', uuid: uuid(), valid: true,
+        velocity: clamp01(m.velocity ?? 1), acceleration: clamp01(m.acceleration ?? 1),
+        blendingRadius: Math.max(0, Math.round(num(m.blendingRadius, 0))),
     };
-    const v = poseValue(mode, it);
-    const dtype = mode === 'cartesian' ? 'cartesianPose' : 'jointPose';
-    return { ...common, dtype, initialValue: v, currentValue: { ...v } };
-}
-
-/** One movement inside a movement node, bound to its pose variable. */
-function poseMovement(mode, it, varUuid, velocity, acceleration) {
-    const m = { name: it.name || '', uuid: uuid(), valid: true, velocity, acceleration, blendingRadius: 0 };
     if (mode === 'cartesian') {
-        m.pose = { position: it.position, orientation: it.orientation, poseVariableId: varUuid };
+        const c = m.cartesian || {};
+        mv.pose = { position: (c.position || [0, 0, 0]).map(Number), orientation: (c.orientation || [0, 0, 0]).map(Number), poseVariableId: null };
     } else {
-        m.approachMode = 1;
-        m.pose = { jointAngles: it.joints, poseVariableId: varUuid };
+        mv.approachMode = 1; // PTP
+        mv.pose = { jointAngles: (m.joints || []).map(Number), poseVariableId: null };
     }
-    return m;
+    return mv;
 }
 
 function moveNode(mode, id, label, movements, x) {
     return {
-        id,
-        type: mode === 'cartesian' ? 'cartesianMovement' : 'jointMovement',
-        parentNode: null,
-        data: { name: label, valid: true, canBeSaved: true, movements },
+        id, type: mode === 'cartesian' ? 'cartesianMovement' : 'jointMovement', parentNode: null,
+        data: { name: label, valid: true, canBeSaved: true, validStates: { general: true }, movements },
         position: { x, y: 0 },
     };
 }
 
-const sanitize = (s) => String(s || '').replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 24) || 'wp';
+function delayNode(id, seconds, x) {
+    const s = String(Math.max(0, num(seconds, 1)));
+    return {
+        id, type: 'delay', parentNode: null,
+        data: { name: '', valid: true, canBeSaved: true, validStates: { general: true }, delay: { dtype: 'float', expressionRaw: s, expressionProcessed: s } },
+        position: { x, y: 0 },
+    };
+}
+
+function payloadNode(id, massKg, comMm, x) {
+    const mass = String(Math.max(0, num(massKg, 0)));
+    const com = (comMm || [0, 0, 0]).map((v) => num(v, 0) / 1000); // mm → m for the flow node
+    return {
+        id, type: 'payload', parentNode: null,
+        data: { name: '', valid: true, canBeSaved: true, validStates: { general: true }, mass: { dtype: 'float', expressionRaw: mass, expressionProcessed: mass }, centerOfMass: com },
+        position: { x, y: 0 },
+    };
+}
 
 /**
- * Build an importable EximFlow from grouped waypoints, each movement bound to a pose variable.
+ * Build an importable flow from an ordered step list.
  * @param {string} name
- * @param {{label?:string, items:{id?:string, name?:string, joints?:number[], position?:number[], orientation?:number[]}[]}[]} groups
- *        groups[].items each carry joints (deg) for joint mode and/or position(mm)+orientation(deg) for cartesian.
- * @param {{mode?:'joint'|'cartesian', velocity?:number, acceleration?:number,
- *          flowUuid?:string, varUuidFor?:(key:string)=>string|undefined}} [opts]
- *        flowUuid / varUuidFor let the caller reuse stable ids across re-pushes (override support).
- * @returns {{flow:object, variableUuids:string[], varByKey:Record<string,string>}}
- *          flow (POST /flows/import), the per-waypoint variable uuids, and a waypoint-key → uuid map.
+ * @param {Array<{kind:'move'|'delay'|'payload', mode?:'joint'|'cartesian', joints?:number[],
+ *   cartesian?:{position:number[],orientation:number[]}, name?:string, velocity?:number,
+ *   acceleration?:number, blendingRadius?:number, seconds?:number, mass?:number, com?:number[]}>} steps
+ * @param {{flowUuid?:string}} [opts] - flowUuid lets a round-trip reuse the loaded flow's id.
+ * @returns {{flow:object, flowUuid:string}} flow for POST /flows/import (or PATCH /flows/{uuid}).
  */
-export function buildWaypointFlow(name, groups, opts = {}) {
-    const mode = opts.mode === 'cartesian' ? 'cartesian' : 'joint';
-    const velocity = opts.velocity ?? 0.1;
-    const acceleration = opts.acceleration ?? 0.1;
+export function buildSequenceFlow(name, steps, opts = {}) {
     const flowUuid = opts.flowUuid || uuid();
-    const short = flowUuid.slice(0, 8);
-
-    const variables = [];
-    const variableUuids = [];
-    const varByKey = {};
-    const nodes = [{
-        id: 'start', type: 'start', parentNode: null,
-        data: { valid: true, validStates: { general: true } }, position: { x: 0, y: 0 },
-    }];
-    const edges = [];
-    // Wrap the whole sequence in an infinite loop: start → loop, and the loop's "loop" (body)
-    // handle drives the movement chain. No stop node — when the body chain ends, the loop just
-    // repeats it forever.
-    nodes.push(loopNode('loop', 380));
-    edges.push(edge('start', 'loop'));
+    const nodes = [startNode(), loopNode('loop', 380)];
+    const edges = [edge('start', 'loop')];
     let prev = 'loop';
     let prevHandle = 'loop'; // first body edge leaves the loop via its "loop" (body) handle
     let x = 760;
-    let gIdx = 0;
-    let wIdx = 0;
+    let idx = 0;
+    const connect = (id) => { edges.push(edge(prev, id, prevHandle)); prev = id; prevHandle = 'out'; x += 380; };
 
-    for (const grp of groups) {
-        const movements = grp.items.map((it) => {
-            const key = it.id != null ? String(it.id) : `${wIdx}`;
-            const varUuid = opts.varUuidFor?.(key) || uuid();
-            const varName = `wp_${short}_${wIdx}_${sanitize(it.name)}`;
-            variables.push(poseVariable(mode, varName, varUuid, it));
-            variableUuids.push(varUuid);
-            varByKey[key] = varUuid;
-            wIdx += 1;
-            return poseMovement(mode, it, varUuid, velocity, acceleration);
-        });
-        const id = `move-${gIdx}`;
-        const label = grp.label || (grp.items.length > 1 ? `Group ${gIdx + 1}` : grp.items[0]?.name || `Move ${gIdx + 1}`);
-        nodes.push(moveNode(mode, id, label, movements, x));
-        edges.push(edge(prev, id, prevHandle));
-        prev = id;
-        prevHandle = 'out';
-        x += 380;
-        gIdx += 1;
+    const list = Array.isArray(steps) ? steps : [];
+    let moveCount = 0;
+    let i = 0;
+    while (i < list.length) {
+        const s = list[i];
+        if (s.kind === 'move') {
+            const mode = s.mode === 'cartesian' ? 'cartesian' : 'joint';
+            const run = [];
+            while (i < list.length && list[i].kind === 'move'
+                && (list[i].mode === 'cartesian' ? 'cartesian' : 'joint') === mode) {
+                run.push(list[i]);
+                i += 1;
+            }
+            const id = `move-${idx++}`;
+            const label = run.length > 1 ? `Move ${idx}` : (run[0].name || `Move ${idx}`);
+            nodes.push(moveNode(mode, id, label, run.map((m) => movementInline(mode, m)), x));
+            connect(id);
+            moveCount += run.length;
+        } else if (s.kind === 'delay') {
+            nodes.push(delayNode(`delay-${idx++}`, s.seconds ?? 1, x));
+            connect(nodes[nodes.length - 1].id);
+            i += 1;
+        } else if (s.kind === 'payload') {
+            nodes.push(payloadNode(`payload-${idx++}`, s.mass ?? 0, s.com ?? [0, 0, 0], x));
+            connect(nodes[nodes.length - 1].id);
+            i += 1;
+        } else {
+            i += 1;
+        }
     }
-    // Cycle marker: log once at the very end of the body so each loop pass emits a timestamped
-    // entry. It's the terminal node — no outgoing edge — and the infinite loop repeats the chain.
+
     nodes.push(messageLogNode('cycle-log', x));
     edges.push(edge(prev, 'cycle-log', prevHandle));
 
     const flow = {
-        name,
-        uuid: flowUuid,
-        version: 'v7.1.7',
-        nodes,
-        edges,
-        groups: [],
+        name, uuid: flowUuid, version: 'v7.1.7', nodes, edges, groups: [],
         settings: {
             speed: 1.0,
             isHomePositionActive: false,
             homePosition: { poseVariableId: null, jointAngles: [] },
-            description: `RobFlow Viewer — ${variableUuids.length} ${mode} waypoints in ${groups.length} node(s)`,
-            environmentFile: null,
-            environmentShift: [0, 0, 0, 0, 0, 0],
-            environmentScale: 1,
-            valid: true,
+            description: `RobFlow Viewer — ${moveCount} waypoint(s) in ${list.length} step(s)`,
+            environmentFile: null, environmentShift: [0, 0, 0, 0, 0, 0], environmentScale: 1, valid: true,
         },
-        variables,
-        subflows: [],
-        modbusConnections: [],
-        robVisionDeviceConnections: [],
-        tools: [],
-        workspaces: [],
-        sqlConfigs: [],
-        conflictAction: null,
-        csvConfigs: [],
+        variables: [], subflows: [], modbusConnections: [], robVisionDeviceConnections: [],
+        tools: [], workspaces: [], sqlConfigs: [], conflictAction: null, csvConfigs: [],
     };
-    return { flow, variableUuids, varByKey };
+    return { flow, flowUuid };
 }
 
-/**
- * @param {string} name
- * @param {{anglesDeg:number[], name?:string}[]} waypoints
- * @param {{velocity?:number, acceleration?:number, merged?:boolean}} [opts]
- * @returns {object} RobFlow v7.0.0 flow dict
- */
-export function buildJointFlow(name, waypoints, opts = {}) {
-    const velocity = opts.velocity ?? 0.1;
-    const acceleration = opts.acceleration ?? 0.1;
-    const merged = opts.merged ?? true;
-
-    const nodes = [{
-        id: 'start', type: 'start', parentNode: null,
-        data: { valid: true, validStates: { general: true } },
-        position: { x: 0, y: 0 },
-    }];
-    const edges = [];
-    let prev = 'start';
-    let stopX;
-
-    if (merged) {
-        const movements = waypoints.map((w, i) =>
-            makeMovement(w.anglesDeg, velocity, acceleration, w.name || `Pose ${i + 1}`));
-        nodes.push(makeJointNode('move-0', name, waypoints[0].anglesDeg, movements, velocity, acceleration, 380));
-        edges.push(edge('start', 'move-0'));
-        prev = 'move-0';
-        stopX = 760;
-    } else {
-        waypoints.forEach((w, i) => {
-            const id = `move-${i}`;
-            const label = w.name || `Pose ${i + 1}`;
-            nodes.push(makeJointNode(id, label, w.anglesDeg,
-                [makeMovement(w.anglesDeg, velocity, acceleration, label)],
-                velocity, acceleration, (i + 1) * 380));
-            edges.push(edge(prev, id));
-            prev = id;
-        });
-        stopX = (waypoints.length + 1) * 380;
-    }
-
-    nodes.push({
-        id: 'stop', type: 'stop', parentNode: null,
-        data: { valid: true, validStates: { general: true } },
-        position: { x: stopX, y: 0 },
-    });
-    edges.push(edge(prev, 'stop'));
-
-    return {
-        name,
-        version: 'v7.0.0',
-        nodes,
-        edges,
-        groups: [],
-        settings: {
-            speed: 1.0,
-            isHomePositionActive: false,
-            homePosition: { poseVariableId: null, jointAngles: [] },
-            description: `Created from RobFlow Viewer — ${waypoints.length} waypoints`,
-            environmentFile: null,
-            environmentShift: [0, 0, 0, 0, 0, 0],
-            environmentScale: 1,
-            valid: true,
-        },
-        variables: [],
-        subflows: [],
-        modbusConnections: [],
-        robVisionDeviceConnections: [],
-        tools: [],
-        workspaces: [],
-        sqlConfigs: [],
-        conflictAction: null,
-        csvConfigs: [],
-    };
+/** Graph-only PartialFlow body for PATCH /flows/{uuid} (in-place round-trip; no variables field). */
+export function flowGraphPatch(flow) {
+    return { name: flow.name, nodes: flow.nodes, edges: flow.edges, groups: flow.groups, settings: flow.settings };
 }

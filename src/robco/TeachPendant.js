@@ -156,6 +156,21 @@ export class TeachPendant {
         return this._tipFromFlange(flange);
     }
 
+    /**
+     * Forward kinematics for arbitrary joint angles (degrees) → base-frame TCP matrix. Same frame
+     * as tcpBaseMatrix (tool tip when a tool offset is set). Used to place markers for joint
+     * waypoints loaded from a flow without disturbing the live pose.
+     */
+    fkBaseMatrix(anglesDeg) {
+        const fk = this.kin.fk((anglesDeg || []).map((d) => (d * Math.PI) / 180));
+        const flange = new THREE.Matrix4().compose(
+            new THREE.Vector3(fk.pos[0], fk.pos[1], fk.pos[2]),
+            rowMajorToQuat(fk.mat),
+            new THREE.Vector3(1, 1, 1),
+        );
+        return this._tipFromFlange(flange);
+    }
+
     // A base-frame target matrix refers to the TCP (tool tip); the IK solves for the flange.
     _solveTip(m4, seedDeg) {
         const flange = this._flangeFromTip(m4);

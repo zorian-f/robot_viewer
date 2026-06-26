@@ -141,7 +141,7 @@ export async function connectLiveSession(app, opts) {
                 // While posing with the gizmo, the dynamics panel follows the previewed pose.
                 if (teach) teach.onPose = (deg) => dynamics?.updateStatic(deg);
 
-                // Waypoints (capture / list / go-to / group) — world-frame, base-relative.
+                // Waypoints (capture / load flow / reorder / go-to) — world-frame, base-relative.
                 if (teach && window._robcoBaseFrame) {
                     const { WaypointStore } = await import('./waypointStore.js');
                     const { WaypointsPanel } = await import('./WaypointsPanel.js');

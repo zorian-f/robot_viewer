@@ -54,7 +54,7 @@ export async function buildStaticRobco(app, { baseUrl, moduleIds, anglesDeg = nu
         // Dragging the gizmo -> recompute the dynamics panel for the posed arm.
         if (teach) teach.onPose = (deg) => window._robcoDynamics?.updateStatic?.(deg);
 
-        // Waypoints (capture / list / go-to / group) — preview only without a client.
+        // Waypoints (capture / load flow / reorder / go-to) — preview only without a client.
         if (teach && window._robcoBaseFrame) {
             const { WaypointStore } = await import('./waypointStore.js');
             const { WaypointsPanel } = await import('./WaypointsPanel.js');

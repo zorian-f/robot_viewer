@@ -408,7 +408,7 @@ export class WaypointsPanel {
         }
     }
 
-    _goTo(it) {
+    async _goTo(it) {
         if (!this.teach) { this._status.textContent = 'teach pendant not ready'; return; }
         if (!it.worldPose) { this._status.textContent = `${it.name}: no world pose to drive to`; return; }
         const res = this.teach.goToBaseMatrix(this.store.baseMatrix(it), it.joints);
@@ -416,13 +416,26 @@ export class WaypointsPanel {
             this._status.textContent = `${it.name}: unreachable (posErr ${(res.posErr * 1000).toFixed(0)} mm)`;
             return;
         }
-        if (this.client) {
-            const deg = res.q.map((r) => (r * 180) / Math.PI);
-            this.client.moveJointAngles(deg, { velocity: 0.3, acceleration: 0.3 })
-                .then(() => { this._status.textContent = `moving to ${it.name}`; })
-                .catch((e) => { this._status.textContent = `move failed: ${e.message}`; });
-        } else {
-            this._status.textContent = `preview ${it.name}`;
+        if (!this.client) { this._status.textContent = `preview ${it.name}`; return; }
+        const deg = res.q.map((r) => (r * 180) / Math.PI);
+        const move = () => this.client.moveJointAngles(deg, { velocity: 0.3, acceleration: 0.3 });
+        try {
+            // RobFlow only allows /move-joint-angles in OperationMode TEACH + RobotState IDLE. If the
+            // robot is merely SWITCHED_ON (powered, not enabled), request OPERATIONAL first to bring
+            // it to IDLE, then move. If it's still transitioning the move 409s → wait briefly + retry.
+            await this.client.setDesiredRobotState(2).catch(() => {}); // 2 = OPERATIONAL
+            await move();
+            this._status.textContent = `moving to ${it.name}`;
+        } catch (e) {
+            if (/\b409\b/.test(e.message)) {
+                await new Promise((r) => setTimeout(r, 600));
+                try { await move(); this._status.textContent = `moving to ${it.name}`; return; }
+                catch (e2) { e = e2; }
+            }
+            const hint = /\b(AUTOMATIC|FLOW)\b/.test(e.message)
+                ? ' — set the robot to TEACH mode on the pendant'
+                : (/\b(SWITCHED_ON|DISABLED)\b/.test(e.message) ? ' — enable the robot on the pendant' : '');
+            this._status.textContent = `move failed: ${e.message}${hint}`;
         }
     }
 

@@ -63,7 +63,7 @@ export class DynamicsDashboard {
         return this._payloadKg;
     }
 
-    /** CoM offset converted to metres (what MujocoDynamics.setPayload expects). */
+    /** CoM offset converted to metres (what the dynamics payload API expects). */
     getPayloadComMeters() {
         return this._payloadCom.map((v) => v / 1000);
     }

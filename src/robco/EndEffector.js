@@ -5,8 +5,10 @@
  * TCP (an editable flange→tip offset routed into the TeachPendant).
  *
  * v1: visual + mass + CoM (bounding-box-center approximation, flange-local). The CoM is "good
- * enough, not accurate" per the brief. Mass + CoM are pushed to DynamicsController.setPayload
- * (rebuilds the MuJoCo load + sizes the CoM marker). Builds its UI as a section of the Setup panel.
+ * enough, not accurate" per the brief. Mass + CoM are pushed to the dynamics as the 'gripper'
+ * payload source (DynamicsController.setPayloadSource) so they're summed with any manual TCP load
+ * rather than overwriting it, and drawn as their own marker sphere. Builds its UI as a section of
+ * the Setup panel.
  */
 import * as THREE from 'three';
 
@@ -109,7 +111,7 @@ export class EndEffector {
         if (this.toolTipIsTcp) this.teach?.setToolOffset?.(null);
         if (this.mount) { this.mount.parent?.remove(this.mount); this.mount = null; this.glb = null; }
         this._fileBytes = null; this._fileName = null;
-        window._robcoDynamics?.setPayload?.(0, [0, 0, 0]);
+        window._robcoDynamics?.setPayloadSource?.('gripper', 0, [0, 0, 0]);
         if (this._body) this._body.style.display = 'none';
         if (this._status) this._status.textContent = 'no tool loaded';
         this.sm.redraw?.();
@@ -122,11 +124,16 @@ export class EndEffector {
         flange.updateMatrixWorld(true);
         this.glb.updateMatrixWorld(true);
         const box = new THREE.Box3().setFromObject(this.glb);
-        if (box.isEmpty()) return;
-        const centerWorld = box.getCenter(new THREE.Vector3());
-        const com = flange.worldToLocal(centerWorld.clone()); // flange-local metres
-        this._com = com.toArray();
-        window._robcoDynamics?.setPayload?.(this.mass, this._com);
+        if (box.isEmpty()) {
+            // No measurable geometry (e.g. an empty/points-only GLB): still apply the mass, at the
+            // flange origin, so a set mass isn't silently dropped.
+            this._com = [0, 0, 0];
+        } else {
+            const centerWorld = box.getCenter(new THREE.Vector3());
+            const com = flange.worldToLocal(centerWorld.clone()); // flange-local metres
+            this._com = com.toArray();
+        }
+        window._robcoDynamics?.setPayloadSource?.('gripper', this.mass, this._com);
         if (this._comOut) this._comOut.textContent = `CoM ≈ [${this._com.map((v) => (v * 1000).toFixed(0)).join(', ')}] mm`;
     }
 

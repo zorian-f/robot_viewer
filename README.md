@@ -55,8 +55,9 @@ your models never leave your device.
   friction + reflected rotor inertia) so the numbers reflect a real geared joint rather than
   an idealized rigid body. A toggle switches between the two; a velocity/acceleration
   estimator with an optional fixed-Δt smoothing interval feeds it.
-- Editable **TCP payload** (mass + center-of-mass offset) with a payload marker at the tool
-  point, and **base-orientation-aware gravity** (wall/ceiling mounts) — both reflected in the
+- Editable **TCP payload(s)** (mass + center-of-mass offset) — a manual TCP load and an
+  imported gripper tool coexist and are **summed**, each shown as its own marker sphere at its
+  CoM — plus **base-orientation-aware gravity** (wall/ceiling mounts); all reflected in the
   torque, current and utilization.
 - See [How joint dynamics are computed](#how-joint-dynamics-are-computed) for the exact model.
 
@@ -125,7 +126,8 @@ A dynamics-only MuJoCo model is built from the module masses, inertias and kinem
 the joint state `(q, q̇, q̈)`, `mj_inverse` returns the rigid-body Newton–Euler torque `τ_NE`
 per joint (gravity + link inertia + Coriolis). Gravity is expressed in the robot **base
 frame**, so tilting the base (wall/ceiling mount) changes the static hold torque correctly,
-and a TCP **payload** (mass + CoM) is welded at the flange and included.
+and any TCP **payloads** (mass + CoM — a manual TCP load and/or an imported gripper) are each
+welded at the flange as their own body, so MuJoCo sums their gravity and inertial torques.
 
 ### 3. Motor model (optional, on by default)
 Rigid-body torque alone describes an idealized arm; a real geared joint also fights friction

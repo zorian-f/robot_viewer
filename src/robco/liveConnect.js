@@ -90,7 +90,7 @@ export async function connectLiveSession(app, opts) {
                 dynamics = await DynamicsController.attach(model);
                 window._robcoDynamics = dynamics; // used by View-panel sliders + end-effector payload
                 if (dynamics && pendingPayload) {
-                    dynamics.setPayload(pendingPayload.mass, pendingPayload.com);
+                    dynamics.setPayloadSource('robot', pendingPayload.mass, pendingPayload.com);
                 }
                 if (dynamics && latestAngles) dynamics.update(latestAngles, performance.now());
             } catch (e) {
@@ -146,15 +146,21 @@ export async function connectLiveSession(app, opts) {
     });
 
     socket.on('payload', (p) => {
-        // Only apply a real robot payload (mass > 0). A zero/absent robot payload must NOT
-        // overwrite the user's manually-set TCP load (persisted in the dynamics panel and
-        // re-applied on attach) — otherwise every (re)connect wipes it and it has to be
-        // re-entered by hand after each reload.
-        if (!p || !(p.mass > 0)) return;
-        // RobFlow payload: mass (kg) + centerOfMass. CoM assumed metres in the flange frame.
-        const com = p.centerOfMass || [0, 0, 0];
-        if (dynamics) dynamics.setPayload(p.mass, com);
-        else pendingPayload = { mass: p.mass, com };
+        // The robot-reported payload is its own 'robot' source, independent of the user's manual
+        // TCP load and any imported gripper. Only apply a real payload (mass > 0); a zero/absent
+        // one would just clear the 'robot' source, but we skip it so a momentary absence doesn't
+        // flicker the load off.
+        const mass = Number.isFinite(+p?.mass) ? +p.mass : 0;
+        if (!(mass > 0)) return;
+        // RobFlow payload: mass (kg) + centerOfMass (flange frame, m). Never trust the wire shape
+        // — normalize CoM to exactly three finite numbers (array, {x,y,z}, short or NaN all happen)
+        // before it reaches the MJCF, which would otherwise reject the model.
+        const raw = p.centerOfMass;
+        const com = Array.isArray(raw)
+            ? [0, 1, 2].map((i) => (Number.isFinite(+raw[i]) ? +raw[i] : 0))
+            : [Number(raw?.x) || 0, Number(raw?.y) || 0, Number(raw?.z) || 0];
+        if (dynamics) dynamics.setPayloadSource('robot', mass, com);
+        else pendingPayload = { mass, com };
     });
 
     socket.on('robotState', (d) => panel.setStates({ robotState: d }));

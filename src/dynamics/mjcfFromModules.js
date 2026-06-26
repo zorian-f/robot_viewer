@@ -4,8 +4,9 @@
  * We only need mass / inertia / kinematics for inverse dynamics — no visual meshes
  * (three.js already renders those). The body tree mirrors RobCo's proximal -> shaft ->
  * distal assembly: each module is welded to the previous module's distal frame; Drive /
- * BaseDrive modules carry a hinge joint about the distal frame's local Z. A payload body
- * is welded at the flange.
+ * BaseDrive modules carry a hinge joint about the distal frame's local Z. Any number of
+ * payload bodies (e.g. a manual TCP load + an imported gripper) are welded at the flange,
+ * each at its own CoM — MuJoCo then sums their gravity + inertial contributions exactly.
  *
  * Pure (no THREE / DOM) so it is unit-testable in Node. Descriptors must be in chain order
  * (base -> flange, clamps included). All SI: metres, kg, kg·m², radians.
@@ -13,7 +14,7 @@
 
 const DRIVE_TYPES = new Set(['Drive', 'BaseDrive']);
 
-const fmt = (n) => (Math.abs(n) < 1e-12 ? '0' : Number(n.toFixed(9)).toString());
+const fmt = (n) => (!Number.isFinite(n) || Math.abs(n) < 1e-12 ? '0' : Number(n.toFixed(9)).toString());
 const vec = (a) => a.map(fmt).join(' ');
 
 /**
@@ -64,26 +65,34 @@ function inertialXml(mass, inertia, com) {
 /**
  * @param {Object[]} descriptors - per-module JSON descriptors, base->flange (clamps included).
  * @param {Object} [opts]
- * @param {number} [opts.payloadMass=0] - TCP payload mass (kg).
- * @param {number[]} [opts.payloadCom=[0,0,0]] - payload CoM in the flange frame (m).
+ * @param {Array<{mass:number, com:number[]}>} [opts.payloads] - TCP payloads (kg + CoM in the
+ *   flange frame, m); each is welded as its own body so several loads sum correctly.
+ * @param {number} [opts.payloadMass=0] - legacy single-payload mass (kg); used only when
+ *   `payloads` is not given.
+ * @param {number[]} [opts.payloadCom=[0,0,0]] - legacy single-payload CoM in the flange frame (m).
  * @param {number[]} [opts.gravity=[0,0,-9.81]]
  * @returns {{xml:string, jointNames:string[]}} MJCF and the hinge joint names base->flange.
  */
 export function mjcfFromModules(descriptors, opts = {}) {
-    const payloadMass = opts.payloadMass ?? 0;
-    const payloadCom = opts.payloadCom ?? [0, 0, 0];
     const gravity = opts.gravity ?? [0, 0, -9.81];
     const jointNames = [];
 
+    // Resolve the payload list: prefer `opts.payloads` (array of {mass, com}); fall back to the
+    // legacy single payloadMass/payloadCom pair so older callers and tests keep working.
+    const payloads = Array.isArray(opts.payloads)
+        ? opts.payloads
+        : (opts.payloadMass > 0 ? [{ mass: opts.payloadMass, com: opts.payloadCom ?? [0, 0, 0] }] : []);
+
     // Inner-most content, welded at the flange of the last module: a TCP site (for FK /
-    // Jacobian / IK) plus an optional payload body.
+    // Jacobian / IK) plus one body per payload, each at its own CoM.
     let inner = '';
     if (opts.tcpSite !== false) {
         inner += `<site name="tcp" pos="${vec(opts.tcpOffset || [0, 0, 0])}" size="0.01"/>`;
     }
-    if (payloadMass > 0) {
-        inner += `<body name="payload">${inertialXml(payloadMass, null, payloadCom)}</body>`;
-    }
+    payloads.forEach((p, i) => {
+        if (!(p?.mass > 0)) return;
+        inner += `<body name="payload_${i}">${inertialXml(p.mass, null, p.com ?? [0, 0, 0])}</body>`;
+    });
 
     for (let i = descriptors.length - 1; i >= 0; i--) {
         const d = descriptors[i] || {};

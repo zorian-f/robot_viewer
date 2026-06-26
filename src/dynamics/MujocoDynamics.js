@@ -102,9 +102,16 @@ export class MujocoDynamics {
         this.data = new this.mj.MjData(this.model);
     }
 
-    /** Update the TCP payload (kg, CoM in flange frame) and rebuild. */
-    setPayload(mass, com = [0, 0, 0]) {
-        this.rebuild({ payloadMass: mass || 0, payloadCom: com });
+    /**
+     * Replace all TCP payloads and rebuild. Each entry is welded as its own body at its CoM
+     * (flange frame, m), so MuJoCo sums their gravity + inertial torques exactly.
+     * @param {Array<{mass:number, com:number[]}>} payloads
+     */
+    setPayloads(payloads) {
+        const list = (Array.isArray(payloads) ? payloads : []).filter((p) => p?.mass > 0);
+        // Clear the legacy single-payload keys so a stale value can't leak through on the next
+        // rebuild — `payloads` is now the single source of truth for the load at the flange.
+        this.rebuild({ payloads: list, payloadMass: 0, payloadCom: [0, 0, 0] });
     }
 
     /**

@@ -13,6 +13,16 @@ import { DynamicsDashboard } from './DynamicsDashboard.js';
 
 const DEG2RAD = Math.PI / 180;
 
+// Per-source payload marker styling. Several loads can be present at once (a manual TCP load
+// plus an imported gripper, plus a live robot-reported payload); each gets its own sphere in a
+// distinct colour so they're individually visible. The manual TCP load keeps the original
+// near-black look for visual continuity. Unknown sources fall back to the TCP style.
+const MARKER_STYLE = {
+    tcp: { color: 0x0d0d0d },
+    gripper: { color: 0x1f6feb },
+    robot: { color: 0x238636 },
+};
+
 export class DynamicsController {
     /**
      * @param {import('../models/UnifiedRobotModel.js').UnifiedRobotModel} model
@@ -32,7 +42,7 @@ export class DynamicsController {
         // Live-tune the derivative estimator from the panel's settings (fixed Δt on/off + ms).
         ctrl.deriv.setOptions(dash.getSettings());
         dash.onSettingsChange = (s) => ctrl.deriv.setOptions(s);
-        ctrl._initMarker(model);
+        ctrl._initMarkers(model);
 
         // Motor-model toggle (real-hardware vs twin-accurate). Recompute on change so the
         // panel updates even while idle.
@@ -42,12 +52,12 @@ export class DynamicsController {
             if (ctrl._lastAngles) ctrl.update(ctrl._lastAngles, performance.now());
         };
 
-        // TCP payload (kg + CoM offset) -> rebuild the dynamics model with a load at the flange.
-        dash.onPayloadChange = (kg, com) => ctrl.setPayload(kg, com);
+        // TCP payload (kg + CoM offset) from the dashboard -> the 'tcp' source. It is combined
+        // with any other source (gripper / robot) rather than overwriting it.
+        dash.onPayloadChange = (kg, com) => ctrl.setPayloadSource('tcp', kg, com);
         const payload0 = dash.getPayload?.() || 0;
         const com0 = dash.getPayloadComMeters?.() || [0, 0, 0];
-        if (payload0 > 0) ctrl.dyn.setPayload(payload0, com0);
-        ctrl._updateMarker(payload0, com0);
+        if (payload0 > 0) ctrl.setPayloadSource('tcp', payload0, com0);
 
         return ctrl;
     }
@@ -60,6 +70,11 @@ export class DynamicsController {
         // times (from the drive's overload configuration; unknown motors default 10 s).
         this.i2t = new I2tModel(dyn.ratedCurrent, dyn.maxCurrent, { tPeakSec: dyn.peakTime });
         this._lastT = null; // ms, for real-Δt thermal integration
+        // Payloads by source ('tcp' | 'gripper' | 'robot'); summed into the dynamics model and
+        // each drawn as its own marker sphere.
+        this._payloads = new Map();
+        this._markers = new Map();
+        this._flange = null;
     }
 
     /**
@@ -120,37 +135,76 @@ export class DynamicsController {
         this.deriv.reset(); // so a later live stream doesn't differentiate across the manual pose
     }
 
-    /** @param {number} mass kg @param {number[]} com flange-frame CoM (m) */
-    setPayload(mass, com = [0, 0, 0]) {
-        this.dyn.setPayload(mass, com); // rebuilds the MuJoCo model with the load at the flange
-        this._updateMarker(mass, com);
+    /**
+     * Add / update / clear one payload source. Sources accumulate rather than overwrite, so a
+     * manual TCP load and an imported gripper (and a live robot payload) all coexist and are
+     * summed into the dynamics model. A mass of 0 removes that source.
+     * @param {string} source - 'tcp' | 'gripper' | 'robot'
+     * @param {number} mass - kg
+     * @param {number[]} com - flange-frame CoM (m)
+     */
+    setPayloadSource(source, mass, com = [0, 0, 0]) {
+        if (mass > 0) {
+            // Skip a redundant full MuJoCo model rebuild + recompute when nothing changed.
+            const prev = this._payloads.get(source);
+            if (prev && prev.mass === mass
+                && prev.com[0] === com[0] && prev.com[1] === com[1] && prev.com[2] === com[2]) return;
+            this._payloads.set(source, { mass, com: com.slice() });
+        } else {
+            if (!this._payloads.has(source)) return; // clearing a source that was never set
+            this._payloads.delete(source);
+        }
+        this.dyn.setPayloads([...this._payloads.values()]); // rebuilds with all loads at the flange
+        this._updateMarkers();
         // Recompute immediately so the change shows even when idle (static pose).
         if (this._lastAngles) this.update(this._lastAngles, performance.now());
     }
 
-    /** A black sphere at the flange marking the payload; sits at the CoM offset, sized by mass. */
-    _initMarker(model) {
+    /** Resolve & cache the flange so payload markers can be parented to it on demand. */
+    _initMarkers(model) {
         const nodes = model.userData?.moduleNodes || [];
-        const flange = nodes.length
+        this._flange = nodes.length
             ? (nodes[nodes.length - 1].getDistalLink?.() || nodes[nodes.length - 1].distal)
             : model.threeObject;
-        if (!flange) return;
-        const mat = new THREE.MeshStandardMaterial({ color: 0x0d0d0d, roughness: 0.45, metalness: 0.1 });
-        this._marker = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), mat);
-        this._marker.castShadow = true;
-        this._marker.visible = false;
-        flange.add(this._marker);
     }
 
-    _updateMarker(mass, com = [0, 0, 0]) {
-        if (!this._marker) return;
-        this._marker.visible = mass > 0;
-        this._marker.position.set(com[0] || 0, com[1] || 0, com[2] || 0);
-        const r = 0.025 + 0.02 * Math.cbrt(Math.max(0, mass)); // grows gently with load
-        this._marker.scale.setScalar(r);
+    /** Lazily create the marker sphere for a payload source, parented at the flange. */
+    _ensureMarker(source) {
+        if (this._markers.has(source)) return this._markers.get(source);
+        if (!this._flange) return null;
+        const style = MARKER_STYLE[source] || MARKER_STYLE.tcp;
+        const mat = new THREE.MeshStandardMaterial({ color: style.color, roughness: 0.45, metalness: 0.1 });
+        const mesh = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), mat);
+        mesh.castShadow = true;
+        mesh.visible = false;
+        mesh.name = `robco-payload-marker-${source}`;
+        this._flange.add(mesh);
+        this._markers.set(source, mesh);
+        return mesh;
+    }
+
+    /** One sphere per active payload source, at its CoM offset, sized by its mass. */
+    _updateMarkers() {
+        for (const [source, mesh] of this._markers) {
+            if (!this._payloads.has(source)) mesh.visible = false;
+        }
+        for (const [source, { mass, com }] of this._payloads) {
+            const mesh = this._ensureMarker(source);
+            if (!mesh) continue;
+            mesh.visible = mass > 0;
+            mesh.position.set(com[0] || 0, com[1] || 0, com[2] || 0);
+            const r = 0.025 + 0.02 * Math.cbrt(Math.max(0, mass)); // grows gently with load
+            mesh.scale.setScalar(r);
+        }
     }
 
     dispose() {
+        for (const mesh of this._markers.values()) {
+            mesh.parent?.remove(mesh);
+            mesh.geometry?.dispose?.();
+            mesh.material?.dispose?.();
+        }
+        this._markers.clear();
         this.dash?.dispose();
         this.dyn?.dispose();
     }

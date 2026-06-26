@@ -47,6 +47,14 @@ export class DynamicsController {
         const jointOrder = model.userData?.jointOrder || [];
         if (jointOrder.length === 0) return null;
 
+        // Idempotent attach: tear down any prior controller (removes its Joint Dynamics panel and
+        // frees its MuJoCo model) so a second attach on the same page — e.g. an auto-restore that
+        // overlaps a live reconnect on reload — can't leave a stale duplicate panel behind.
+        if (typeof window !== 'undefined' && window._robcoDynamics) {
+            try { window._robcoDynamics.dispose(); } catch { /* ignore */ }
+            window._robcoDynamics = null;
+        }
+
         const dyn = await MujocoDynamics.create(descriptors, opts);
         const dash = new DynamicsDashboard(jointOrder, opts.parent);
         const ctrl = new DynamicsController(dyn, dash);

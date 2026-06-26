@@ -174,6 +174,9 @@ export class DynamicsDashboard {
     }
 
     _build(parent) {
+        // Singleton in the DOM: drop any leftover Joint Dynamics panel from a prior controller so
+        // there is never more than one (guards against any path that attaches twice on a reload).
+        document.querySelectorAll('.robco-dynamics-panel').forEach((n) => n.remove());
         const el = document.createElement('div');
         el.className = 'robco-dynamics-panel';
         el.style.cssText = `

@@ -21,6 +21,12 @@ const uuid = () =>
 
 const clamp01 = (v) => Math.max(0, Math.min(1, Number.isFinite(+v) ? +v : 0));
 const num = (v, d = 0) => (Number.isFinite(+v) ? +v : d);
+// RobFlow's movement-node editor accepts at most 2 decimal places per numeric field. Round
+// everything we write to match, so a pushed pose reads back identically in the editor and a later
+// open+save there can't silently shift it. 0.01 mm / 0.01° / 0.01 (vel/acc) is well below robot
+// repeatability, so this costs no practical accuracy.
+const round2 = (v) => Math.round((Number.isFinite(+v) ? +v : 0) * 100) / 100;
+const round2arr = (a) => (Array.isArray(a) ? a : []).map(round2);
 
 // VueFlow edge: target always connects to the implicit "in" handle; source leaves via `handle`.
 const edge = (src, tgt, handle = 'out') => ({
@@ -58,15 +64,15 @@ function messageLogNode(id, x) {
 function movementInline(mode, m) {
     const mv = {
         name: m.name || '', uuid: uuid(), valid: true,
-        velocity: clamp01(m.velocity ?? 1), acceleration: clamp01(m.acceleration ?? 1),
+        velocity: round2(clamp01(m.velocity ?? 1)), acceleration: round2(clamp01(m.acceleration ?? 1)),
         blendingRadius: Math.max(0, Math.round(num(m.blendingRadius, 0))),
     };
     if (mode === 'cartesian') {
         const c = m.cartesian || {};
-        mv.pose = { position: (c.position || [0, 0, 0]).map(Number), orientation: (c.orientation || [0, 0, 0]).map(Number), poseVariableId: null };
+        mv.pose = { position: round2arr(c.position || [0, 0, 0]), orientation: round2arr(c.orientation || [0, 0, 0]), poseVariableId: null };
     } else {
         mv.approachMode = 1; // PTP
-        mv.pose = { jointAngles: (m.joints || []).map(Number), poseVariableId: null };
+        mv.pose = { jointAngles: round2arr(m.joints || []), poseVariableId: null };
     }
     return mv;
 }

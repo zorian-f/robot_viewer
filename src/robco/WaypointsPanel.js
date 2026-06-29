@@ -467,14 +467,20 @@ export class WaypointsPanel {
                 noPose.push(it.name);
             }
         }
-        this._clampBlending(steps);
-        return { steps, unreachable, noPose };
+        const clampedBlend = this._clampBlending(steps);
+        return { steps, unreachable, noPose, clampedBlend };
     }
 
-    /** Clamp each move's blending radius to ~half the distance to its nearest move neighbour (mm). */
+    /**
+     * Clamp each move's blending radius to ~half the distance to its nearest move neighbour (mm),
+     * since RobFlow rejects a blend that overruns the segment. Returns the moves whose value was
+     * actually reduced so the caller can surface it — otherwise a raised blend that lands above the
+     * cap looks like "the edit did nothing".
+     */
     _clampBlending(steps) {
         const moves = steps.filter((s) => s.kind === 'move');
         const pos = moves.map((m) => (m.mode === 'cartesian' ? m.cartesian.position : null));
+        const clamped = [];
         for (let i = 0; i < moves.length; i++) {
             if (!pos[i]) continue; // joint move — distance unknown without FK; leave as set
             let maxR = Infinity;
@@ -483,14 +489,18 @@ export class WaypointsPanel {
                 const d = Math.hypot(pos[i][0] - pos[j][0], pos[i][1] - pos[j][1], pos[i][2] - pos[j][2]);
                 maxR = Math.min(maxR, d / 2);
             }
-            if (Number.isFinite(maxR)) moves[i].blendingRadius = Math.min(moves[i].blendingRadius, Math.floor(maxR));
+            if (!Number.isFinite(maxR)) continue;
+            const capped = Math.min(moves[i].blendingRadius, Math.floor(maxR));
+            if (capped < moves[i].blendingRadius) clamped.push(`${moves[i].name || `move ${i + 1}`}→${capped}mm`);
+            moves[i].blendingRadius = capped;
         }
+        return clamped;
     }
 
     async _push(run) {
         if (!this.client) { this._status.textContent = 'no connection — open Connect first'; return; }
         if (this.store.items.length === 0) { this._status.textContent = 'nothing to push'; return; }
-        const { steps, unreachable, noPose } = this._buildSteps();
+        const { steps, unreachable, noPose, clampedBlend } = this._buildSteps();
         if (unreachable.length) {
             this._status.textContent = `unreachable from this base: ${unreachable.join(', ')} — reposition base or switch to cartesian`;
             return;
@@ -523,11 +533,16 @@ export class WaypointsPanel {
             this._currentFlowUuid = uuid;
             this._loadedName = name;
             this._lastPush = { flowUuid: uuid, name };
+            // Surface any blend reduced to fit its segment, so a raised value that hit the cap
+            // doesn't look like the edit was ignored.
+            const blendNote = clampedBlend.length ? ` · blend capped: ${clampedBlend.join(', ')}` : '';
             if (run) {
                 await this._beginRun(uuid);
-                this._status.textContent = `running "${name}" (${steps.length} step(s))`;
+                this._status.textContent = `running "${name}" (${steps.length} step(s))${blendNote}`;
             } else {
-                this._status.textContent = `pushed "${name}" — ${steps.length} step(s)`;
+                // Plain Push only updates the flow definition — a looping flow keeps the old params
+                // until re-run, so nudge toward Run when the change should take effect live.
+                this._status.textContent = `pushed "${name}" — ${steps.length} step(s) · press Run to apply${blendNote}`;
             }
         } catch (e) {
             const hint = /\b40[13]\b/.test(e.message) ? ' — editor login required (reconnect with the editor password)' : '';

@@ -24,6 +24,11 @@ const BTN = 'font:600 11px ui-monospace,monospace;color:#e6edf3;background:rgba(
     'border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:5px 9px;cursor:pointer;';
 const NUM = 'background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:4px;' +
     'color:#e6edf3;padding:1px 3px;font:inherit;text-align:right;';
+// The flow <select>: color-scheme:dark makes Chromium render the native option popup dark; the
+// opaque per-option colours below cover Firefox (its popup ignores the parent's translucent bg).
+const SELECT = 'flex:1;min-width:0;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);' +
+    'border-radius:4px;color:#e6edf3;padding:2px 4px;font:inherit;color-scheme:dark;';
+const OPT = 'background:#0d1117;color:#e6edf3;';
 const D2R = Math.PI / 180;
 
 function el(tag, css, text) {
@@ -117,8 +122,8 @@ export class WaypointsPanel {
 
         // --- load from RobFlow ---
         const flowsRow = el('div', 'display:flex;align-items:center;gap:6px;margin-bottom:6px;');
-        this._flowSelect = el('select', 'flex:1;min-width:0;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:4px;color:#e6edf3;padding:2px 4px;font:inherit;');
-        this._flowSelect.append(el('option', null, '— flows —'));
+        this._flowSelect = el('select', SELECT);
+        this._flowSelect.append(el('option', OPT, '— flows —'));
         const refreshBtn = el('button', BTN, '↻');
         refreshBtn.title = 'List RobFlow flows';
         refreshBtn.addEventListener('click', () => this._refreshFlows());
@@ -230,9 +235,9 @@ export class WaypointsPanel {
         try {
             const flows = await this.client.listFlows();
             this._flowSelect.innerHTML = '';
-            this._flowSelect.append(el('option', null, `— ${flows.length} flow(s) —`));
+            this._flowSelect.append(el('option', OPT, `— ${flows.length} flow(s) —`));
             for (const f of flows) {
-                const o = el('option', null, f.name || f.uuid);
+                const o = el('option', OPT, f.name || f.uuid);
                 o.value = f.uuid;
                 this._flowSelect.append(o);
             }

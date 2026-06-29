@@ -141,8 +141,10 @@ export class RobFlowToolsPanel {
         this._acc = slider('accel', 0.01, 1, 0.01, 1);
         const apprRow = el('div', 'display:flex;align-items:center;gap:8px;margin:4px 0;');
         apprRow.append(el('span', 'opacity:.8;width:64px;', 'approach'));
-        this._appr = el('select', 'flex:1;background:rgba(255,255,255,0.08);color:#e6edf3;border:1px solid rgba(255,255,255,0.15);border-radius:5px;padding:3px;font:inherit;');
-        this._appr.innerHTML = '<option value="1">PTP</option><option value="2">Linear</option>';
+        // color-scheme:dark darkens the native option popup in Chromium; the per-option
+        // background/colour covers Firefox, whose popup ignores the parent's translucent bg.
+        this._appr = el('select', 'flex:1;background:rgba(255,255,255,0.08);color:#e6edf3;border:1px solid rgba(255,255,255,0.15);border-radius:5px;padding:3px;font:inherit;color-scheme:dark;');
+        this._appr.innerHTML = '<option style="background:#0d1117;color:#e6edf3;" value="1">PTP</option><option style="background:#0d1117;color:#e6edf3;" value="2">Linear</option>';
         apprRow.append(this._appr);
         const sendRow = el('div', 'display:flex;gap:6px;margin-top:6px;');
         this._sendBtn = el('button', BTN + 'border-color:#2f81f7;flex:1;', 'Send to Robot');

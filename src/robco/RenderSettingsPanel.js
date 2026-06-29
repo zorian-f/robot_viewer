@@ -102,8 +102,10 @@ export class RenderSettingsPanel {
         // Tone mapping select
         const tmRow = el('div', 'display:flex;align-items:center;gap:8px;margin:5px 0;');
         tmRow.append(el('span', 'opacity:.8;width:62px;', 'tone'));
-        const tm = el('select', 'flex:1;background:rgba(255,255,255,0.08);color:#e6edf3;border:1px solid rgba(255,255,255,0.15);border-radius:5px;padding:3px;font:inherit;');
-        tm.innerHTML = Object.keys(TONE).map((k) => `<option value="${k}"${k === this.s.tone ? ' selected' : ''}>${k}</option>`).join('');
+        // color-scheme:dark darkens the native option popup in Chromium; the per-option
+        // background/colour covers Firefox, whose popup ignores the parent's translucent bg.
+        const tm = el('select', 'flex:1;background:rgba(255,255,255,0.08);color:#e6edf3;border:1px solid rgba(255,255,255,0.15);border-radius:5px;padding:3px;font:inherit;color-scheme:dark;');
+        tm.innerHTML = Object.keys(TONE).map((k) => `<option style="background:#0d1117;color:#e6edf3;" value="${k}"${k === this.s.tone ? ' selected' : ''}>${k}</option>`).join('');
         tm.addEventListener('change', () => { this.s.tone = tm.value; this._applyTone(); this._save(); this.sm.render?.(); });
         tmRow.append(tm);
         body.append(tmRow);

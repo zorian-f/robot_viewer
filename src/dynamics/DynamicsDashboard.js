@@ -46,6 +46,7 @@ export class DynamicsDashboard {
     constructor(jointLabels, parent = document.body) {
         this.jointLabels = jointLabels;
         this.rows = [];
+        this._heatEma = []; // per-joint smoothed heat, for the trend arrow (rising/cooling)
         /** @type {?(s:{fixedDt:boolean,fixedDtMs:number})=>void} */
         this.onSettingsChange = null;
         /** @type {?(kg:number)=>void} */
@@ -295,14 +296,24 @@ export class DynamicsDashboard {
                 pct.style.cssText =
                     'position:absolute;right:4px;top:0;line-height:12px;font-size:10px;color:#fff;';
                 wrap.appendChild(pct);
+                // i²t heat trend arrow (current bar only): ▲ heating / ▼ cooling / – steady.
+                let trend = null;
+                if (withHeat) {
+                    trend = document.createElement('span');
+                    trend.style.cssText =
+                        'position:absolute;left:4px;top:0;line-height:12px;font-size:9px;font-weight:700;' +
+                        'text-shadow:0 0 2px rgba(0,0,0,0.85);';
+                    wrap.appendChild(trend);
+                }
                 row.appendChild(wrap);
-                return { wrap, bar, pct, heat };
+                return { wrap, bar, pct, heat, trend };
             };
             const mech = makeBar(false);
             const curr = makeBar(true);
             cells.mechBar = mech.bar; cells.mechPct = mech.pct; cells.mechWrap = mech.wrap;
             cells.currBar = curr.bar; cells.currPct = curr.pct; cells.currWrap = curr.wrap;
             cells.heat = curr.heat;
+            cells.trend = curr.trend;
             cells.title = label;
             row.title = label;
 
@@ -313,7 +324,10 @@ export class DynamicsDashboard {
         this._buildSettings(el);
 
         // Per-joint time-series graphs (mech/curr utilization + i²t heat), collapsible.
-        this._timeline = new JointTimeline(this.jointLabels, { onResetHeat: () => this.onResetHeat?.() });
+        // Resetting heat also clears the trend baseline so the arrows restart neutral.
+        this._timeline = new JointTimeline(this.jointLabels, {
+            onResetHeat: () => { this._heatEma = []; this.onResetHeat?.(); },
+        });
         el.appendChild(this._timeline.element);
 
         parent.appendChild(el);
@@ -433,6 +447,8 @@ export class DynamicsDashboard {
                 r.heat.style.width = h == null ? '0' : `${Math.min(100, h).toFixed(0)}%`;
                 r.heat.style.background = heatColor(h);
             }
+            // Minimal heat-trend arrow on the current bar: ▲ heating / ▼ cooling / – steady.
+            if (r.trend) this._renderHeatTrend(r.trend, i, h);
             if (r.currWrap) {
                 r.currWrap.title = `${r.title} — current (electrical) ${fmtUtil(uc)}`
                     + (h == null ? '' : `, i²t heat ${h.toFixed(0)}%`);
@@ -440,6 +456,30 @@ export class DynamicsDashboard {
         }
         // Append this sample to the per-joint time-series graphs.
         this._timeline?.push({ mech: utilization, curr: currentUtil, heat });
+    }
+
+    /**
+     * Update the per-joint heat-trend arrow from the i²t heat index. Compares the live heat to a
+     * slow EMA of itself: above the smoothed value ⇒ accumulating (▲), below ⇒ cooling (▼), within
+     * a small deadband ⇒ steady (–). This reads the multi-second trend, not frame-to-frame jitter.
+     * @param {HTMLElement} node
+     * @param {number} i - joint index
+     * @param {number|null} h - i²t heat index (%), null when unknown
+     */
+    _renderHeatTrend(node, i, h) {
+        if (h == null) { node.textContent = ''; node.title = ''; return; }
+        const ema = this._heatEma[i];
+        if (ema == null) {
+            this._heatEma[i] = h;
+            node.textContent = '–'; node.style.color = '#5b6b7a'; node.title = 'heat steady';
+            return;
+        }
+        const d = h - ema;
+        this._heatEma[i] = ema + 0.05 * d; // ~1–2 s time constant at stream rate
+        const EPS = 0.3; // % deadband so a flat heat doesn't flicker
+        if (d > EPS) { node.textContent = '▲'; node.style.color = '#f85149'; node.title = 'heat rising'; }
+        else if (d < -EPS) { node.textContent = '▼'; node.style.color = '#3fb950'; node.title = 'heat cooling'; }
+        else { node.textContent = '–'; node.style.color = '#5b6b7a'; node.title = 'heat steady'; }
     }
 
     dispose() {

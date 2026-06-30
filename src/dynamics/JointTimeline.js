@@ -14,9 +14,17 @@
  * Fed one sample per DynamicsDashboard.render(); capture is cheap and always on, but the canvases
  * are only redrawn while the section is expanded.
  */
-const WINDOW_S = 60;          // rolling time window kept in the buffers
+const WINDOW_S = 60;          // rolling time window kept in the buffers (max zoom-out)
+const MIN_VIEW_S = 2;         // closest zoom-in on the time axis
+const DEFAULT_CHART_H = 96;   // default (and reset) chart height in px
 const COLORS = { mech: '#3fb950', curr: '#2f81f7', heat: '#f0883e' };
 const STORE_KEY = 'robco-dyn-graphs';
+
+/** A "nice" time-axis tick step (s) giving ~3-6 ticks across the visible span. */
+function niceTimeStep(span) {
+    for (const c of [1, 2, 5, 10, 15, 20, 30, 60]) if (span / c <= 6) return c;
+    return 60;
+}
 
 const el = (tag, css, text) => {
     const e = document.createElement(tag);
@@ -45,6 +53,7 @@ export class JointTimeline {
         this.expanded = JointTimeline._loadExpanded();
         this.series = jointLabels.map(() => ({
             t: [], mech: [], curr: [], heat: [], peak: { mech: 0, curr: 0, heat: 0 },
+            viewS: WINDOW_S, // visible time span (s); wheel-zoomable per chart
         }));
         this.canvases = [];
         this._build();
@@ -77,6 +86,13 @@ export class JointTimeline {
                 el('span', null, name));
             legend.append(item);
         }
+        const resetSizeBtn = el('button',
+            'background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);color:#e6edf3;' +
+            'border-radius:6px;padding:3px 8px;cursor:pointer;font:inherit;');
+        resetSizeBtn.textContent = 'Reset size';
+        resetSizeBtn.title = 'Reset all graph windows to the default size';
+        resetSizeBtn.addEventListener('click', () => this.resetSizes());
+
         const resetBtn = el('button',
             'background:rgba(255,255,255,0.06);border:1px solid rgba(248,81,73,0.5);color:#e6edf3;' +
             'border-radius:6px;padding:3px 8px;cursor:pointer;font:inherit;');
@@ -84,18 +100,45 @@ export class JointTimeline {
         resetBtn.title = 'Clear the i²t heat accumulation + its graph history';
         resetBtn.addEventListener('click', () => { this.clearHeat(); this.onResetHeat?.(); });
 
-        header.append(this._toggle, legend, resetBtn);
+        header.append(this._toggle, legend, resetSizeBtn, resetBtn);
         root.append(header);
 
-        this._charts = el('div', 'margin-top:8px;max-height:340px;overflow-y:auto;' +
+        // width:100% so the section tracks the panel's width; overflow:auto keeps an enlarged chart
+        // scrolling inside instead of widening the whole panel.
+        this._charts = el('div', 'margin-top:8px;width:100%;box-sizing:border-box;max-height:70vh;overflow:auto;' +
             (this.expanded ? '' : 'display:none;'));
+        this.wraps = [];
         this.labels.forEach((label, i) => {
+            // Each chart sits in a resizable window — drag the bottom-right corner to enlarge it
+            // and see the detail better. The canvas is absolutely positioned to fill the wrapper so
+            // it never contributes its backing-store pixel width to the panel's shrink-to-fit width
+            // (which otherwise fed back into a runaway that pushed the panel off-screen).
+            // min-width:100% keeps a chart from shrinking below the panel (tab) width; it can still
+            // be dragged wider/taller, and Reset size returns it to the default.
+            const wrap = el('div',
+                `box-sizing:border-box;position:relative;width:100%;min-width:100%;height:${DEFAULT_CHART_H}px;` +
+                'min-height:70px;margin:6px 0;resize:both;overflow:hidden;' +
+                'border:1px solid rgba(255,255,255,0.08);border-radius:6px;');
+            wrap.title = `${label} — scroll to zoom the time axis · double-click to reset · drag corner to resize`;
             const c = document.createElement('canvas');
-            c.style.cssText = 'width:100%;height:72px;display:block;margin:6px 0;';
-            c.title = label;
-            this._charts.append(c);
+            c.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block;';
+            // Scroll to zoom the time (X) axis; double-click resets to the full window.
+            c.addEventListener('wheel', (e) => this._onWheelZoom(e, i), { passive: false });
+            c.addEventListener('dblclick', () => { this.series[i].viewS = WINDOW_S; this._drawChart(i); });
+            wrap.append(c);
+            this._charts.append(wrap);
             this.canvases.push(c);
+            this.wraps.push(wrap);
         });
+        // Redraw a chart at its new backing-store size whenever its window is resized.
+        this._ro = new ResizeObserver((entries) => {
+            if (!this.expanded) return;
+            for (const e of entries) {
+                const idx = this.wraps.indexOf(e.target);
+                if (idx >= 0) this._drawChart(idx);
+            }
+        });
+        this.wraps.forEach((w) => this._ro.observe(w));
         root.append(this._charts);
 
         this.root = root;
@@ -143,6 +186,21 @@ export class JointTimeline {
         if (this.expanded) this._drawAll();
     }
 
+    /** Reset every chart window to the default size (panel width × default height). */
+    resetSizes() {
+        for (const w of this.wraps) { w.style.width = '100%'; w.style.height = `${DEFAULT_CHART_H}px`; }
+        if (this.expanded) this._drawAll();
+    }
+
+    /** Wheel over a chart zooms its time axis (scroll up = zoom in), anchored at "now". */
+    _onWheelZoom(e, i) {
+        e.preventDefault();
+        const s = this.series[i];
+        const factor = e.deltaY < 0 ? 0.85 : 1 / 0.85;
+        s.viewS = Math.max(MIN_VIEW_S, Math.min(WINDOW_S, s.viewS * factor));
+        this._drawChart(i);
+    }
+
     _drawAll() {
         for (let i = 0; i < this.n; i++) this._drawChart(i);
     }
@@ -181,18 +239,25 @@ export class JointTimeline {
             ctx.fillText(`${v}`, padL - 4, y);
         }
 
-        // X axis: time in seconds relative to now (0 at right).
+        // X axis: time in seconds relative to now (0 at right). viewS is the wheel-zoomable span.
+        const viewS = s.viewS;
         const now = s.t.length ? s.t[s.t.length - 1] : performance.now();
-        const spanMs = WINDOW_S * 1000;
+        const spanMs = viewS * 1000;
         const tToPx = (t) => padL + plotW * (1 - (now - t) / spanMs);
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
         ctx.fillStyle = 'rgba(157,167,179,0.7)';
-        for (let sec = 0; sec <= WINDOW_S; sec += 20) {
-            const x = padL + plotW * (1 - sec / WINDOW_S);
-            ctx.fillText(sec === 0 ? '0s' : `-${sec}`, x, cssH - padB + 2);
+        const tickStep = niceTimeStep(viewS);
+        for (let sec = 0; sec <= viewS + 1e-6; sec += tickStep) {
+            const x = padL + plotW * (1 - sec / viewS);
+            ctx.fillText(sec === 0 ? '0s' : `-${sec % 1 ? sec.toFixed(1) : sec}`, x, cssH - padB + 2);
         }
 
+        // Clip series to the plot rect so zoomed-out-of-view points don't bleed over the axes.
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(padL, padT, plotW, plotH);
+        ctx.clip();
         // Series polylines (skip null gaps).
         const drawSeries = (key) => {
             ctx.strokeStyle = COLORS[key];
@@ -222,6 +287,7 @@ export class JointTimeline {
         drawSeries('mech');
         drawSeries('curr');
         drawSeries('heat');
+        ctx.restore(); // end plot clip
 
         // Header: joint label + per-series peak (max) values, colour-coded.
         ctx.textBaseline = 'top';
@@ -241,8 +307,11 @@ export class JointTimeline {
     }
 
     dispose() {
+        this._ro?.disconnect();
+        this._ro = null;
         this.root?.remove();
         this.canvases = [];
+        this.wraps = [];
         this.series = [];
     }
 }

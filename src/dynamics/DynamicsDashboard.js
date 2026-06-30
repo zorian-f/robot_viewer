@@ -5,6 +5,7 @@
  * joint count; `render()` just updates values + the utilization bars.
  */
 import { makeDraggable } from '../robco/draggable.js';
+import { JointTimeline } from './JointTimeline.js';
 
 const RAD2DEG = 180 / Math.PI;
 
@@ -51,6 +52,8 @@ export class DynamicsDashboard {
         this.onPayloadChange = null;
         /** @type {?(on:boolean)=>void} */
         this.onMotorModelChange = null;
+        /** @type {?()=>void} - reset the i²t heat accumulation (fired by the Graphs "Reset heat" button). */
+        this.onResetHeat = null;
         this.settings = DynamicsDashboard._loadSettings();
         this._motorModel = DynamicsDashboard._loadMotorModel();
         const pay = DynamicsDashboard._loadPayload();
@@ -309,6 +312,10 @@ export class DynamicsDashboard {
 
         this._buildSettings(el);
 
+        // Per-joint time-series graphs (mech/curr utilization + i²t heat), collapsible.
+        this._timeline = new JointTimeline(this.jointLabels, { onResetHeat: () => this.onResetHeat?.() });
+        el.appendChild(this._timeline.element);
+
         parent.appendChild(el);
         this.el = el;
         makeDraggable(el, this._title, 'dynamics');
@@ -431,9 +438,12 @@ export class DynamicsDashboard {
                     + (h == null ? '' : `, i²t heat ${h.toFixed(0)}%`);
             }
         }
+        // Append this sample to the per-joint time-series graphs.
+        this._timeline?.push({ mech: utilization, curr: currentUtil, heat });
     }
 
     dispose() {
+        this._timeline?.dispose();
         this.el?.remove();
     }
 }

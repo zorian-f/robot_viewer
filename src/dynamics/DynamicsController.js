@@ -72,6 +72,14 @@ export class DynamicsController {
             if (ctrl._lastAngles) ctrl.update(ctrl._lastAngles, performance.now());
         };
 
+        // Reset the i²t heat accumulation (from the Graphs "Reset heat" button), then recompute so
+        // the bars + graphs show heat≈0 immediately even while idle.
+        dash.onResetHeat = () => {
+            ctrl.i2t.reset();
+            ctrl._lastT = null; // don't integrate thermal across the reset gap
+            if (ctrl._lastAngles) ctrl.update(ctrl._lastAngles, performance.now());
+        };
+
         // TCP payload (kg + CoM offset) from the dashboard -> the 'tcp' source. It is combined
         // with any other source (gripper / robot) rather than overwriting it.
         dash.onPayloadChange = (kg, com) => ctrl.setPayloadSource('tcp', kg, com);

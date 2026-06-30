@@ -131,6 +131,14 @@ export class ViewPanel {
         const grid = this.sm.referenceGrid || this.sm.environmentManager?.referenceGrid;
         body.append(this._check('Reference grid', (on) => this._setGridVisible(on), grid ? grid.visible !== false : true, 'grid'));
 
+        // Trace — draw the path the TCP sweeps (any motion source). Engine lives on the global,
+        // created with the teach pendant (same lazy pattern as the Waypoints toggle above).
+        body.append(title('Trace'));
+        body.append(this._check('TCP trace', (on) => window._robcoTcpTrace?.setEnabled(on), false, 'tcpTrace'));
+        const clearTrace = el('button', BTN + 'margin:2px 0;', 'Clear trace');
+        clearTrace.addEventListener('click', () => { window._robcoTcpTrace?.clear(); this._render(); });
+        body.append(clearTrace);
+
         // Inertia
         body.append(title('Inertia'));
         body.append(this._check('Center of mass', (on) => this.sm.inertialVisualization?.toggleCenterOfMass(on, this._model()), false, 'com'));

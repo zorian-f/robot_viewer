@@ -166,6 +166,11 @@ export class WaypointsPanel {
         this._status = el('div', 'font-size:11px;color:#9da7b3;min-height:14px;margin-top:6px;');
         body.append(this._status);
 
+        // Alternate-configurations result list (filled by a row's ⌥ button). Lives outside the
+        // dynamic step list so a base move / reachability refresh re-render doesn't wipe it.
+        this._altBox = el('div', 'margin-top:6px;display:none;');
+        body.append(this._altBox);
+
         body.append(this._buildPush());
 
         minBtn.addEventListener('click', () => {
@@ -345,11 +350,15 @@ export class WaypointsPanel {
         const blend = numInput(it.blendingRadius, { w: 40, step: 5, min: 0, field: 'blend', onChange: (i) => this.store.update(it.id, { blendingRadius: Math.max(0, Math.round(+i.value || 0)) }) });
         blend.title = 'blending radius (mm)';
 
+        const alt = el('button', BTN + 'padding:3px 6px;flex:0 0 auto;', '⌥');
+        alt.title = 'find alternate joint configurations for this TCP';
+        alt.draggable = false;
+        alt.addEventListener('click', () => this._showAlternates(it));
         const go = el('button', BTN + 'padding:3px 6px;flex:0 0 auto;', 'Go');
         go.draggable = false;
         go.addEventListener('click', () => this._goTo(it));
         const del = this._delBtn(it.id);
-        row.append(dot, name, modeBtn, vel, acc, blend, go, del);
+        row.append(dot, name, modeBtn, vel, acc, blend, alt, go, del);
     }
 
     _delayRow(row, it) {
@@ -442,6 +451,88 @@ export class WaypointsPanel {
                 : (/\b(SWITCHED_ON|DISABLED)\b/.test(e.message) ? ' — enable the robot on the pendant' : '');
             this._status.textContent = `move failed: ${e.message}${hint}`;
         }
+    }
+
+    // --- alternate configurations --------------------------------------
+    /**
+     * Find the joint configurations that reach a waypoint's TCP and list them for preview. Drives
+     * to the waypoint's stored branch first (preview only — no robot command) so the enumerated
+     * Current row is that branch and the rest are genuine alternates. Pauses the live WS mirror
+     * (app._teachActive) for the list's lifetime so a preview isn't snapped back by an incoming frame.
+     */
+    _showAlternates(it) {
+        if (!this.teach) { this._status.textContent = 'teach pendant not ready'; return; }
+        if (!it.worldPose) { this._status.textContent = `${it.name}: no pose to search`; return; }
+        const baseM = this.store.baseMatrix(it);
+        const drive = this.teach.goToBaseMatrix(baseM, it.joints);
+        if (!drive.converged) {
+            this._status.textContent = `${it.name}: unreachable from this base`;
+            return;
+        }
+        this.app.sceneManager?.redraw?.();
+        if (this._altFor == null) this._altPrevTeach = this.app._teachActive; // remember once
+        this.app._teachActive = true;
+        this._altFor = it.id;
+        this._status.textContent = `finding poses for ${it.name}…`;
+        requestAnimationFrame(async () => {
+            try {
+                const list = await this.teach.findConfigurationsAsync(
+                    baseM, {}, (p) => { this._status.textContent = `finding poses for ${it.name}… ${Math.round(p * 100)}%`; },
+                );
+                this._renderAlternates(it, list);
+                const alts = list.filter((c) => !c.isCurrent).length;
+                this._status.textContent = `${it.name}: ${alts} alternate configuration(s)`;
+            } catch (e) {
+                this._status.textContent = `find poses failed: ${e.message}`;
+                console.error('[RobCo] waypoint alternates failed:', e);
+            }
+        });
+    }
+
+    _renderAlternates(it, list) {
+        this._altBox.innerHTML = '';
+        this._altBox.style.display = 'block';
+        const head = el('div', 'display:flex;align-items:center;gap:6px;margin-bottom:3px;');
+        const redundant = this.teach?.jointNames?.length > 6;
+        head.append(el('span', 'flex:1;min-width:0;font-size:10px;color:#6e7681;text-transform:uppercase;letter-spacing:.04em;',
+            `${it.name} — configs${redundant ? ' (sampled)' : ''}`));
+        const close = el('button', BTN + 'padding:2px 7px;flex:0 0 auto;', '✕');
+        close.title = 'close (resume live mirror)';
+        close.addEventListener('click', () => this._clearAlternates());
+        head.append(close);
+        this._altBox.append(head);
+
+        let n = 0;
+        for (const cfg of list) {
+            const row = el('div', 'display:flex;align-items:center;gap:6px;margin:2px 0;padding:1px 3px;border-radius:5px;' +
+                (cfg.isCurrent ? 'background:rgba(35,134,54,0.12);' : ''));
+            const tight = cfg.minMarginDeg < 20;
+            const color = cfg.isCurrent ? '#3fb950' : (tight ? '#d29922' : '#2f81f7');
+            row.append(el('span', `display:inline-block;width:8px;height:8px;border-radius:50%;flex:0 0 auto;background:${color};`));
+            const labelText = cfg.isCurrent ? 'Captured' : `Config ${++n}`;
+            row.append(el('span', 'flex:1;min-width:0;', labelText));
+            if (!cfg.isCurrent) row.append(el('span', 'opacity:.7;font-size:10px;', `Δ${Math.round(cfg.dist)}°`));
+            const margin = el('span', `opacity:.7;font-size:10px;${tight ? 'color:#d29922;' : ''}`, `m${Math.round(cfg.minMarginDeg)}°`);
+            margin.title = 'worst-axis margin to the ±270° limit';
+            row.append(margin);
+            const prev = el('button', BTN + 'padding:2px 7px;flex:0 0 auto;', 'Preview');
+            prev.title = cfg.deg.map((d) => d.toFixed(1)).join(', ') + '°';
+            prev.addEventListener('click', () => {
+                this.teach.applyConfig(cfg.deg);
+                this.app.sceneManager?.redraw?.();
+                for (const r of this._altBox.children) r.style.outline = '';
+                row.style.outline = '1px solid #2f81f7';
+                this._status.textContent = `previewing ${labelText} — use Capture / Send to apply`;
+            });
+            row.append(prev);
+            this._altBox.append(row);
+        }
+    }
+
+    _clearAlternates() {
+        if (this._altFor != null) this.app._teachActive = this._altPrevTeach;
+        this._altFor = null;
+        if (this._altBox) { this._altBox.innerHTML = ''; this._altBox.style.display = 'none'; }
     }
 
     // --- push ----------------------------------------------------------

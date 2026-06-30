@@ -56,7 +56,9 @@ export class RobFlowToolsPanel {
     setTeach(teach) {
         this.teach = teach;
         if (teach) {
-            teach.onIk = (res) => this._setIk(res);
+            // onIk fires on a gizmo drag (the TCP moved) — show the new IK readout and drop any
+            // configuration list, which was enumerated for the previous TCP and is now stale.
+            teach.onIk = (res) => { this._setIk(res); this._clearPoses(); };
             teach.onModeChange = (m) => this._setMode(m);
             // Keep the Teach button in sync when the arbiter turns the gizmo off.
             teach.onEnabledChange = (on) => this._teachVisible(on);
@@ -126,14 +128,19 @@ export class RobFlowToolsPanel {
         this._teachBtn = el('button', BTN, 'Teach: OFF');
         this._moveBtn = el('button', BTN + 'display:none;', 'Move (W)');
         this._rotBtn = el('button', BTN + 'display:none;', 'Rotate (E)');
-        teachRow.append(this._teachBtn, this._moveBtn, this._rotBtn);
+        this._findBtn = el('button', BTN + 'display:none;', 'Find poses');
+        teachRow.append(this._teachBtn, this._moveBtn, this._rotBtn, this._findBtn);
         root.append(teachRow);
         this._ik = el('div', 'margin-top:6px;font-size:11px;color:#9da7b3;min-height:16px;');
         root.append(this._ik);
+        // Alternate IK configurations for the current TCP (filled by Find poses).
+        this._posesBox = el('div', 'margin-top:6px;display:none;');
+        root.append(this._posesBox);
 
         this._teachBtn.addEventListener('click', () => this._toggleTeach());
         this._moveBtn.addEventListener('click', () => this.teach?.setMode('translate'));
         this._rotBtn.addEventListener('click', () => this.teach?.setMode('rotate'));
+        this._findBtn.addEventListener('click', () => this._findPoses());
 
         // --- Send (needs client) ---
         this._sendBox = el('div', 'margin-top:8px;');
@@ -237,8 +244,10 @@ export class RobFlowToolsPanel {
     _teachVisible(on) {
         this._moveBtn.style.display = on ? 'inline-block' : 'none';
         this._rotBtn.style.display = on ? 'inline-block' : 'none';
+        this._findBtn.style.display = on ? 'inline-block' : 'none';
         this._sendBox.style.display = on && this.client ? 'block' : 'none';
         this._ik.style.display = on ? 'block' : 'none';
+        if (!on) this._clearPoses();
         this._teachBtn.textContent = `Teach: ${on ? 'ON' : 'OFF'}`;
         this._teachBtn.style.background = on ? '#238636' : 'rgba(255,255,255,0.06)';
     }
@@ -257,6 +266,80 @@ export class RobFlowToolsPanel {
         this._ik.textContent = res.converged
             ? `IK ok · ${res.iters} it · ${(res.posErr * 1000).toFixed(1)} mm / ${(res.rotErr * 180 / Math.PI).toFixed(1)}°`
             : `IK best-effort · ${(res.posErr * 1000).toFixed(0)} mm / ${(res.rotErr * 180 / Math.PI).toFixed(0)}°`;
+    }
+
+    // --- find alternate configurations ----------------------------------
+    /** Enumerate the joint configurations that reach the current TCP, then list them. */
+    _findPoses() {
+        if (!this.teach) return;
+        this._findBtn.disabled = true;
+        this._ik.textContent = 'finding poses…';
+        // Defer one frame so the "finding…" label paints before the (synchronous-per-chunk) sweep.
+        requestAnimationFrame(async () => {
+            try {
+                const list = await this.teach.findConfigurationsAsync(
+                    this.teach.tcpBaseMatrix(), {},
+                    (p) => { this._ik.textContent = `finding poses… ${Math.round(p * 100)}%`; },
+                );
+                this._renderPoses(list);
+                const alts = list.filter((c) => !c.isCurrent).length;
+                this._ik.textContent = alts
+                    ? `${alts} alternate configuration(s)`
+                    : 'no alternate configurations found';
+            } catch (e) {
+                this._ik.textContent = `find poses failed: ${e.message}`;
+                console.error('[RobCo] find poses failed:', e);
+            } finally {
+                this._findBtn.disabled = false;
+            }
+        });
+    }
+
+    _renderPoses(list) {
+        this._posesBox.innerHTML = '';
+        this._posesBox.style.display = 'block';
+        const redundant = this.teach?.jointNames?.length > 6;
+        const head = el('div', 'font-size:10px;color:#6e7681;margin-bottom:3px;',
+            redundant ? 'configurations (sampled — redundant arm)' : 'configurations (same TCP)');
+        this._posesBox.append(head);
+        if (!list.length) { this._posesBox.append(el('div', 'opacity:.6;font-size:11px;', 'none found')); return; }
+
+        let n = 0;
+        for (const cfg of list) {
+            const row = el('div', 'display:flex;align-items:center;gap:6px;margin:2px 0;padding:1px 3px;border-radius:5px;' +
+                (cfg.isCurrent ? 'background:rgba(35,134,54,0.12);' : ''));
+            const tight = cfg.minMarginDeg < 20;
+            const color = cfg.isCurrent ? '#3fb950' : (tight ? '#d29922' : '#2f81f7');
+            row.append(el('span', `display:inline-block;width:8px;height:8px;border-radius:50%;flex:0 0 auto;background:${color};`));
+            const label = cfg.isCurrent ? 'Current' : `Config ${++n}`;
+            row.append(el('span', 'flex:1;min-width:0;', label));
+            if (!cfg.isCurrent) row.append(el('span', 'opacity:.7;font-size:10px;', `Δ${Math.round(cfg.dist)}°`));
+            const margin = el('span', `opacity:.7;font-size:10px;${tight ? 'color:#d29922;' : ''}`, `m${Math.round(cfg.minMarginDeg)}°`);
+            margin.title = 'worst-axis margin to the ±270° limit';
+            row.append(margin);
+            const prev = el('button', BTN + 'padding:2px 7px;flex:0 0 auto;', 'Preview');
+            prev.title = cfg.deg.map((d) => d.toFixed(1)).join(', ') + '°';
+            prev.addEventListener('click', () => {
+                this.teach.applyConfig(cfg.deg);
+                this._markPreviewed(row);
+                this._ik.textContent = `previewing ${label} — use Send / Capture to apply`;
+            });
+            row.append(prev);
+            this._posesBox.append(row);
+        }
+    }
+
+    _markPreviewed(activeRow) {
+        for (const r of this._posesBox.querySelectorAll('[data-prev]')) r.removeAttribute('data-prev');
+        activeRow.dataset.prev = '1';
+        for (const r of this._posesBox.children) r.style.outline = '';
+        activeRow.style.outline = '1px solid #2f81f7';
+    }
+
+    _clearPoses() {
+        if (!this._posesBox) return;
+        this._posesBox.innerHTML = '';
+        this._posesBox.style.display = 'none';
     }
 
     // --- robot commands -------------------------------------------------

@@ -11,7 +11,37 @@
 import * as THREE from 'three';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
 import { MujocoKinematics } from '../dynamics/MujocoKinematics.js';
+import { ROBCO_AXIS_LIMIT_DEG } from './robcoLimits.js';
 import { registerManipulator, activateManipulator } from './manipulators.js';
+
+// Pose enumeration: how many seeds to try, when two solutions count as the same
+// configuration, how many to surface, and how many solves to run per animation frame.
+const FIND_SAMPLES = 48;        // random seeds (bumped for redundant arms — see buildSeeds)
+const FIND_DEDUP_TOL_DEG = 2.0; // max per-joint diff below which two solutions are one config
+const FIND_MAX_RESULTS = 12;
+const FIND_CHUNK = 8;           // solves per frame in the async (UI) path
+
+/** Smallest signed angular gap a→b (degrees), folded into (−180, 180]. */
+function angDiffDeg(a, b, wrapAware = true) {
+    let d = a - b;
+    if (wrapAware) d = ((d + 180) % 360 + 360) % 360 - 180;
+    return Math.abs(d);
+}
+
+/** Largest absolute joint angle in a vector (worst axis, for limit-margin colouring). */
+function maxAbs(arr) {
+    return arr.reduce((m, v) => Math.max(m, Math.abs(v)), 0);
+}
+
+/** Deterministic PRNG so the same TCP yields the same seed set (stable list between clicks). */
+function mulberry32(a) {
+    return function () {
+        a |= 0; a = (a + 0x6D2B79F5) | 0;
+        let t = Math.imul(a ^ (a >>> 15), 1 | a);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+}
 
 function quatToRowMajor(q) {
     const e = new THREE.Matrix4().makeRotationFromQuaternion(q).elements;
@@ -204,13 +234,148 @@ export class TeachPendant {
 
     /** A small spread of fallback IK seeds (degrees) for the reachability retry. */
     _altSeeds() {
+        return this._structuredSeeds();
+    }
+
+    /**
+     * Deterministic IK seeds (degrees) covering the canonical branch structure: the current pose,
+     * home, two coarse spreads, single-joint sign flips of the current pose, and a last-joint
+     * (wrist) pre-flip. These are where alternate-branch IK basins (elbow up/down, wrist flip)
+     * tend to cluster. Shared by reachability retries and pose enumeration.
+     */
+    _structuredSeeds() {
         const n = this.jointNames.length;
-        return [
-            this.currentAnglesDeg(),                                  // current pose
+        const cur = this.currentAnglesDeg();
+        const seeds = [
+            cur,                                                      // current pose
             new Array(n).fill(0),                                     // home
             Array.from({ length: n }, (_, i) => (i % 2 ? 90 : -90)),  // spread A
             Array.from({ length: n }, (_, i) => (i % 2 ? -120 : 60)), // spread B
         ];
+        // Single-joint sign flips of the current pose.
+        for (let j = 0; j < n; j++) {
+            const s = cur.slice();
+            s[j] = -s[j];
+            seeds.push(s);
+        }
+        // Wrist pre-flip: rotate the last axis ±180° (common wrist-flip branch).
+        if (n > 0) {
+            const a = cur.slice(); a[n - 1] += 180; seeds.push(a);
+            const b = cur.slice(); b[n - 1] -= 180; seeds.push(b);
+        }
+        return seeds;
+    }
+
+    /**
+     * Build the full enumeration seed set: structured seeds + `samples` pseudo-random vectors over
+     * ±ROBCO_AXIS_LIMIT_DEG, drawn from a PRNG seeded by the target so the list is stable per TCP.
+     */
+    _buildSeeds(samples, prng) {
+        const n = this.jointNames.length;
+        const seeds = this._structuredSeeds();
+        const span = 2 * ROBCO_AXIS_LIMIT_DEG;
+        for (let s = 0; s < samples; s++) {
+            seeds.push(Array.from({ length: n }, () => prng() * span - ROBCO_AXIS_LIMIT_DEG));
+        }
+        return seeds;
+    }
+
+    /**
+     * Enumerate the distinct joint configurations (degrees) that reach a base-frame TCP target.
+     * IK has no closed form here, so we solve from many diverse seeds and de-duplicate the
+     * converged solutions by joint-space distance. Wrap-aware dedup collapses ±360° winding
+     * variants to distinct arm shapes. Returns rows sorted by joint travel from the current pose
+     * (closest alternative first), the current pose folded in / flagged as `isCurrent`.
+     *
+     * @param {THREE.Matrix4} m4 base-frame TCP (tool tip when a tool offset is set).
+     * @returns {Array<{deg:number[], posErr:number, rotErr:number, dist:number, isCurrent:boolean, minMarginDeg:number}>}
+     */
+    findConfigurationsForMatrix(m4, opts = {}) {
+        const seeds = this._enumSeeds(m4, opts);
+        const accepted = [];
+        for (const seedDeg of seeds) this._tryAccept(m4, seedDeg, accepted, opts);
+        return this._finishConfigs(accepted, opts);
+    }
+
+    /** Enumerate configurations for the current TCP pose. */
+    findConfigurations(opts = {}) {
+        return this.findConfigurationsForMatrix(this.tcpBaseMatrix(), opts);
+    }
+
+    /**
+     * Chunked enumeration for the UI: runs FIND_CHUNK solves per animation frame so a heavy sweep
+     * doesn't block the main thread, reporting fractional progress (0→1) via `onProgress`.
+     */
+    async findConfigurationsAsync(m4, opts = {}, onProgress = null) {
+        const seeds = this._enumSeeds(m4, opts);
+        const accepted = [];
+        for (let i = 0; i < seeds.length; i += FIND_CHUNK) {
+            for (let k = i; k < Math.min(i + FIND_CHUNK, seeds.length); k++) {
+                this._tryAccept(m4, seeds[k], accepted, opts);
+            }
+            onProgress?.(Math.min(1, (i + FIND_CHUNK) / seeds.length));
+            await new Promise((r) => requestAnimationFrame(() => r()));
+        }
+        return this._finishConfigs(accepted, opts);
+    }
+
+    /** Seed set for an enumeration run (structured + target-seeded random samples). */
+    _enumSeeds(m4, opts) {
+        const samples = opts.samples ?? (this.jointNames.length > 6 ? 64 : FIND_SAMPLES);
+        const p = new THREE.Vector3().setFromMatrixPosition(m4);
+        const hash = Math.round(p.x * 1000) * 73856093 ^ Math.round(p.y * 1000) * 19349663 ^ Math.round(p.z * 1000) * 83492791;
+        return this._buildSeeds(samples, mulberry32(hash | 0));
+    }
+
+    /** Solve from one seed; if it converges and is a new configuration, push it onto `accepted`. */
+    _tryAccept(m4, seedDeg, accepted, opts) {
+        const tol = opts.dedupTolDeg ?? FIND_DEDUP_TOL_DEG;
+        const wrap = opts.wrapAware ?? true;
+        const res = this._solveTip(m4, seedDeg);
+        if (!res.converged) return;
+        const deg = res.q.map((r) => (r * 180) / Math.PI);
+        for (const a of accepted) {
+            if (a.deg.every((v, i) => angDiffDeg(v, deg[i], wrap) < tol)) {
+                // Duplicate: keep whichever winds closer to zero (better limit margin).
+                if (maxAbs(deg) < maxAbs(a.deg)) { a.deg = deg; a.posErr = res.posErr; a.rotErr = res.rotErr; }
+                return;
+            }
+        }
+        accepted.push({ deg, posErr: res.posErr, rotErr: res.rotErr });
+    }
+
+    /** Annotate (travel, limit margin, current flag), fold in the current pose, sort + cap. */
+    _finishConfigs(accepted, opts) {
+        const tol = opts.dedupTolDeg ?? FIND_DEDUP_TOL_DEG;
+        const wrap = opts.wrapAware ?? true;
+        const curDeg = this.currentAnglesDeg();
+        const rows = accepted.map((a) => ({
+            ...a,
+            dist: a.deg.reduce((s, v, i) => s + angDiffDeg(v, curDeg[i], wrap), 0),
+            minMarginDeg: ROBCO_AXIS_LIMIT_DEG - maxAbs(a.deg),
+            isCurrent: false,
+        }));
+        const current = rows.find((r) => r.deg.every((v, i) => angDiffDeg(v, curDeg[i], wrap) < tol));
+        if (current) { current.isCurrent = true; current.dist = 0; }
+        else if (opts.includeCurrent ?? true) {
+            rows.unshift({
+                deg: curDeg, posErr: 0, rotErr: 0, dist: 0,
+                minMarginDeg: ROBCO_AXIS_LIMIT_DEG - maxAbs(curDeg), isCurrent: true,
+            });
+        }
+        rows.sort((a, b) => a.dist - b.dist);
+        return rows.slice(0, opts.maxResults ?? FIND_MAX_RESULTS);
+    }
+
+    /**
+     * Apply a configuration (degrees) as a joint-space preview — no IK solve; the TCP is unchanged.
+     * Deliberately does NOT fire onIk: that callback signals a TCP change (a gizmo drag) and the
+     * panel uses it to drop a now-stale configuration list, which a same-TCP preview must not do.
+     */
+    applyConfig(deg) {
+        this._applyQ((deg || []).map((d) => (d * Math.PI) / 180));
+        this.onPose?.(this.currentAnglesDeg());
+        this.syncTcp();
     }
 
     /** Solve IK to a base-frame target WITHOUT moving the arm; returns joint angles (deg). */

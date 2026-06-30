@@ -96,9 +96,9 @@ export class JointTimeline {
         const resetBtn = el('button',
             'background:rgba(255,255,255,0.06);border:1px solid rgba(248,81,73,0.5);color:#e6edf3;' +
             'border-radius:6px;padding:3px 8px;cursor:pointer;font:inherit;');
-        resetBtn.textContent = 'Reset heat';
-        resetBtn.title = 'Clear the i²t heat accumulation + its graph history';
-        resetBtn.addEventListener('click', () => { this.clearHeat(); this.onResetHeat?.(); });
+        resetBtn.textContent = 'Reset';
+        resetBtn.title = 'Reset the i²t heat accumulation and clear all graph history (mech, curr, heat)';
+        resetBtn.addEventListener('click', () => { this.clearAll(); this.onResetHeat?.(); });
 
         header.append(this._toggle, legend, resetSizeBtn, resetBtn);
         root.append(header);
@@ -177,11 +177,11 @@ export class JointTimeline {
         if (this.expanded) this._drawAll();
     }
 
-    /** Reset only the heat: null out heat history + heat peak; leave mech/curr intact. */
-    clearHeat() {
+    /** General reset: clear all graph history + peaks (mech, curr, heat) so the graphs start fresh. */
+    clearAll() {
         for (const s of this.series) {
-            s.heat = s.heat.map(() => null);
-            s.peak.heat = 0;
+            s.t = []; s.mech = []; s.curr = []; s.heat = [];
+            s.peak.mech = 0; s.peak.curr = 0; s.peak.heat = 0;
         }
         if (this.expanded) this._drawAll();
     }

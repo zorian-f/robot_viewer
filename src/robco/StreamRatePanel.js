@@ -9,7 +9,7 @@
  * Draggable + minimizable, in the same style as the View / Render panels. Reads a
  * FrequencyMeter; does no measurement itself.
  */
-import { makeDraggable } from './draggable.js';
+import { makeDraggable, makeCollapsible } from './draggable.js';
 
 const PANEL_CSS =
     'position:fixed;right:332px;top:16px;z-index:3000;width:288px;font:12px/1.4 ui-monospace,Menlo,Consolas,monospace;' +
@@ -87,11 +87,7 @@ export class StreamRatePanel {
         this._report = el('div', 'margin-top:8px;');
         body.append(this._report);
 
-        minBtn.addEventListener('click', () => {
-            const hidden = body.style.display === 'none';
-            body.style.display = hidden ? 'block' : 'none';
-            minBtn.textContent = hidden ? '▾' : '▸';
-        });
+        makeCollapsible(body, minBtn, 'stream');
 
         document.body.appendChild(root);
         this.root = root;

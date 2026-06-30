@@ -11,7 +11,7 @@
  * Draggable/minimizable, persisted position key `waypoints`.
  */
 import * as THREE from 'three';
-import { makeDraggable } from './draggable.js';
+import { makeDraggable, makeCollapsible } from './draggable.js';
 import { buildSequenceFlow, flowGraphPatch } from '../transport/flowBuilder.js';
 import { parseFlow } from '../transport/flowParser.js';
 import { DEFAULT_BLEND_MM } from './waypointStore.js';
@@ -173,11 +173,7 @@ export class WaypointsPanel {
 
         body.append(this._buildPush());
 
-        minBtn.addEventListener('click', () => {
-            const hidden = body.style.display === 'none';
-            body.style.display = hidden ? 'block' : 'none';
-            minBtn.textContent = hidden ? '▾' : '▸';
-        });
+        makeCollapsible(body, minBtn, 'waypoints');
 
         document.body.appendChild(root);
         this.root = root;

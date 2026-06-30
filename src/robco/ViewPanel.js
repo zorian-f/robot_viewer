@@ -11,7 +11,7 @@
  */
 import * as THREE from 'three';
 import { ModelLoaderFactory } from '../loaders/ModelLoaderFactory.js';
-import { makeDraggable } from './draggable.js';
+import { makeDraggable, makeCollapsible } from './draggable.js';
 import { registerManipulator, activateManipulator, deactivateManipulator } from './manipulators.js';
 
 const PANEL_CSS =
@@ -186,11 +186,7 @@ export class ViewPanel {
         shot.addEventListener('click', () => this._screenshot());
         body.append(shot);
 
-        minBtn.addEventListener('click', () => {
-            const hidden = body.style.display === 'none';
-            body.style.display = hidden ? 'block' : 'none';
-            minBtn.textContent = hidden ? '▾' : '▸';
-        });
+        makeCollapsible(body, minBtn, 'view');
 
         document.body.appendChild(root);
         this.root = root;

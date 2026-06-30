@@ -8,7 +8,7 @@
  *   Load Session…  → pick a file → stage it → reload, so it restores on a clean page.
  *   Clear saved    → forget the auto-restore snapshot and reload clean.
  */
-import { makeDraggable } from './draggable.js';
+import { makeDraggable, makeCollapsible } from './draggable.js';
 import {
     FORMAT, saveSession, stageAndReload, clearSavedSession, hasSavedSession, assetsBytes,
 } from './sessionSnapshot.js';
@@ -98,11 +98,7 @@ export class SessionPanel {
         this._statusEl = el('div', 'font-size:10px;color:#9da7b3;margin-top:7px;min-height:13px;');
         body.append(this._statusEl);
 
-        minBtn.addEventListener('click', () => {
-            const hidden = body.style.display === 'none';
-            body.style.display = hidden ? 'block' : 'none';
-            minBtn.textContent = hidden ? '▾' : '▸';
-        });
+        makeCollapsible(body, minBtn, 'session');
 
         document.body.appendChild(root);
         this.root = root;

@@ -4,7 +4,7 @@
  * Applies to the shared renderer/scene/lights and persists to localStorage.
  */
 import * as THREE from 'three';
-import { makeDraggable } from './draggable.js';
+import { makeDraggable, makeCollapsible } from './draggable.js';
 import { createStudioEnvironment } from './studioEnvironment.js';
 
 const TONE = {
@@ -168,11 +168,7 @@ export class RenderSettingsPanel {
         body.append(this._slider('metalness', 0, 1, 0.01, this.s.metalness, (v) => { this.s.metalness = v; this._applyMaterials(); this._save(); this.sm.render?.(); }));
         body.append(this._slider('roughness', 0, 1, 0.01, this.s.roughness, (v) => { this.s.roughness = v; this._applyMaterials(); this._save(); this.sm.render?.(); }));
 
-        minBtn.addEventListener('click', () => {
-            const hidden = body.style.display === 'none';
-            body.style.display = hidden ? 'block' : 'none';
-            minBtn.textContent = hidden ? '▾' : '▸';
-        });
+        makeCollapsible(body, minBtn, 'render');
 
         document.body.appendChild(root);
         this.root = root;

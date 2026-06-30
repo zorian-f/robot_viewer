@@ -6,6 +6,32 @@
  * Pass a stable `key` to remember the panel's position across reloads (localStorage).
  */
 const POS_PREFIX = 'robco-pos-';
+const COLLAPSE_PREFIX = 'robco-collapsed-';
+
+/**
+ * Persist a panel's collapsed (minimized) state across reloads, mirroring how positions are stored.
+ * Wires the minimize button to toggle `body` visibility + the ▾/▸ glyph, restores the saved state
+ * on load, and saves on every toggle.
+ * @param {HTMLElement} body - the collapsible content element.
+ * @param {HTMLElement} btn  - the minimize button (text becomes ▾ when expanded / ▸ when collapsed).
+ * @param {string} key       - stable key (shared with makeDraggable's position key).
+ */
+export function makeCollapsible(body, btn, key) {
+    const apply = (collapsed) => {
+        body.style.display = collapsed ? 'none' : 'block';
+        btn.textContent = collapsed ? '▸' : '▾';
+    };
+    let collapsed = false;
+    if (key) {
+        try { collapsed = JSON.parse(localStorage.getItem(COLLAPSE_PREFIX + key)) === true; } catch { /* ignore */ }
+    }
+    apply(collapsed);
+    btn.addEventListener('click', () => {
+        collapsed = body.style.display !== 'none';
+        apply(collapsed);
+        if (key) { try { localStorage.setItem(COLLAPSE_PREFIX + key, JSON.stringify(collapsed)); } catch { /* ignore */ } }
+    });
+}
 
 function loadPos(key) {
     try {

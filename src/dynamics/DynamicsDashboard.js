@@ -478,7 +478,7 @@ export class DynamicsDashboard {
         this._heatEma[i] = ema + 0.05 * d; // ~1–2 s time constant at stream rate
         const EPS = 0.3; // % deadband so a flat heat doesn't flicker
         if (d > EPS) { node.textContent = '▲'; node.style.color = '#f85149'; node.title = 'heat rising'; }
-        else if (d < -EPS) { node.textContent = '▼'; node.style.color = '#3fb950'; node.title = 'heat cooling'; }
+        else if (d < -EPS) { node.textContent = '▼'; node.style.color = '#2f81f7'; node.title = 'heat cooling'; }
         else { node.textContent = '–'; node.style.color = '#5b6b7a'; node.title = 'heat steady'; }
     }
 

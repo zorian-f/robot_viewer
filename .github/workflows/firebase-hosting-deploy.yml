@@ -1,12 +1,13 @@
 name: Deploy to Firebase Hosting
 
 # Builds the Vite app and deploys it to Firebase Hosting on every push:
-#   - main    -> production "live" channel   (https://orrerium.web.app)
-#   - develop -> stable preview channel       (https://orrerium--develop-<hash>.web.app)
+#   - main       -> production "live" channel  (https://orrerium.web.app)
+#   - develop    -> stable preview channel      (https://orrerium--develop-<hash>.web.app)
+#   - feat/**    -> per-branch preview channel   (https://orrerium--feat-<name>-<hash>.web.app)
 # Manual runs via the "Run workflow" button are also supported.
 on:
   push:
-    branches: [main, develop]
+    branches: [main, develop, 'feat/**']
   workflow_dispatch:
 
 permissions:

@@ -1,0 +1,38 @@
+name: CI
+
+# Pull-request build check. Branch protection on `main` requires this ("build") to pass before a
+# PR can merge, so a broken build can't reach production. Runs for PRs targeting main or develop.
+on:
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # pnpm before setup-node so `cache: pnpm` resolves; version comes from package.json
+      # "packageManager" (do not pin here too, or action-setup errors on the duplicate).
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm run build

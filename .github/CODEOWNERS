@@ -1,0 +1,8 @@
+# Code owners — GitHub requests their review on PRs, and branch protection on `main`
+# requires an owner approval before merge. Keeps @zorian-f the authority over what ships.
+
+# Default owner for the whole repo.
+* @zorian-f
+
+# CI/CD, deploy config and workflows — always owner-reviewed (guards deploy triggers + secrets).
+/.github/ @zorian-f

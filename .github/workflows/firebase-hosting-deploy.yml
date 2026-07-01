@@ -12,6 +12,7 @@ on:
 
 permissions:
   contents: read
+  statuses: write   # so the deploy can publish its preview URL as a linked commit status
 
 # Avoid overlapping deploys racing each other; cancel an in-progress run when a
 # newer commit lands on the same ref.
@@ -54,6 +55,7 @@ jobs:
       # Pinned at v0 (latest v0.10.0): still ships on Node 20, so it logs the Node-20
       # deprecation warning. There is no Node-24 release upstream yet — bump when one lands.
       - name: Deploy to Firebase Hosting
+        id: deploy
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
@@ -61,3 +63,24 @@ jobs:
           projectId: orrerium
           channelId: ${{ github.ref_name == 'main' && 'live' || github.ref_name }}
           expires: 30d
+
+      # Surface the deployed URL instead of leaving it buried in the logs:
+      #   - a run Job Summary line (shown on the Actions run's Summary tab), and
+      #   - for preview branches, a linked "firebase preview" commit status — a clickable
+      #     check that appears on the branch's commit AND in any PR opened from it.
+      - name: Publish preview link
+        if: steps.deploy.outputs.details_url != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          URL: ${{ steps.deploy.outputs.details_url }}
+        run: |
+          {
+            echo "### 🔥 Firebase ${{ github.ref_name == 'main' && 'production' || 'preview' }}"
+            echo ""
+            echo "$URL"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "${{ github.ref_name }}" != "main" ]; then
+            gh api -X POST "repos/${{ github.repository }}/statuses/${{ github.sha }}" \
+              -f state=success -f context="firebase preview" \
+              -f description="Preview deploy — click Details" -f target_url="$URL"
+          fi

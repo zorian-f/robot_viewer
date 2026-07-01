@@ -9,6 +9,7 @@
  */
 import { OPERATION_MODE, ROBOT_STATE, SAFETY_STATE, label, SEVERITY_COLOR, canTeach } from './robcoEnums.js';
 import { makeDraggable } from './draggable.js';
+import { loadPresets, matchPreset, MODULES_CDN } from './robotPresets.js';
 
 const PANEL_CSS =
     'position:fixed;right:16px;top:16px;z-index:3000;width:300px;font:12px/1.45 ui-monospace,Menlo,Consolas,monospace;' +
@@ -121,6 +122,9 @@ export class RobFlowToolsPanel {
         this._robotLine = el('div'); this._modeLine = el('div'); this._safetyLine = el('div');
         root.append(this._robotLine, this._modeLine, this._safetyLine);
         this._renderStates();
+
+        // --- Robot Config (pick + apply a virtual-robot preset) ---
+        this._buildRobotConfig(root);
 
         // --- Teach ---
         root.append(sectionTitle('Teach Pendant'));
@@ -237,6 +241,144 @@ export class RobFlowToolsPanel {
         if (this._sendBtn) {
             this._sendBtn.style.borderColor = teachable ? '#2f81f7' : '#d29922';
             this._sendBtn.title = teachable ? 'Send the previewed joint pose' : 'Robot not in TEACH mode';
+        }
+    }
+
+    // --- robot config (preset picker) -----------------------------------
+    // Indicator + dropdown + Apply. Connected → POST /virtual-robot/configure (via
+    // app._robcoApplyModules); the live mirror then rebuilds the viewer. Offline → build locally.
+    _buildRobotConfig(root) {
+        root.append(sectionTitle('Robot Config'));
+        this._rcPresets = [];
+        this._rcConnected = false;
+        this._rcLiveIds = null;
+        this._rcSyncedKey = null;
+
+        const line = el('div', 'margin-bottom:4px;');
+        this._rcDot = el('span', dot('#5b6b7a'));
+        this._rcTxt = el('span', null, 'loading catalog…');
+        line.append(this._rcDot, this._rcTxt);
+        root.append(line);
+
+        const row = el('div', 'display:flex;gap:6px;align-items:center;margin-top:2px;');
+        this._rcSelect = el('select',
+            'flex:1;min-width:0;background:rgba(255,255,255,0.08);color:#e6edf3;border:1px solid rgba(255,255,255,0.15);' +
+            'border-radius:5px;padding:3px;font:inherit;color-scheme:dark;');
+        this._rcSelect.append(el('option', 'background:#0d1117;color:#e6edf3;', '— robots —'));
+        this._rcSelect.addEventListener('change', () => this._rcRenderDetail());
+        this._rcApplyBtn = el('button', BTN + 'flex:0 0 auto;border-color:#2f81f7;', 'Load in viewer');
+        this._rcApplyBtn.addEventListener('click', () => this._rcApply());
+        row.append(this._rcSelect, this._rcApplyBtn);
+        root.append(row);
+
+        this._rcDetail = el('div', 'font-size:10px;color:#6e7681;margin-top:4px;min-height:12px;');
+        root.append(this._rcDetail);
+
+        this._rcLoadPresets();
+    }
+
+    async _rcLoadPresets() {
+        this._rcStatus('loading robot catalog…');
+        try {
+            this._rcPresets = await loadPresets();
+        } catch (e) {
+            this._rcPresets = [];
+            console.warn('[RobCo] preset catalog load failed:', e);
+        }
+        this._rcFillSelect();
+        this._rcRender();
+    }
+
+    _rcFillSelect() {
+        this._rcSelect.innerHTML = '';
+        const opt = (t, v) => { const o = el('option', 'background:#0d1117;color:#e6edf3;', t); if (v != null) o.value = v; return o; };
+        if (!this._rcPresets.length) { this._rcSelect.append(opt('— catalog unavailable —')); return; }
+        this._rcSelect.append(opt('— pick a robot —'));
+        this._rcPresets.forEach((p, i) => {
+            const bits = [`${p.dof ?? '?'}-DoF`];
+            if (p.reachM != null) bits.push(`${p.reachM.toFixed(2)} m`);
+            if (p.payloadKg != null) bits.push(`${p.payloadKg} kg`);
+            this._rcSelect.append(opt(`${p.englishName} — ${bits.join(' · ')}`, String(i)));
+        });
+    }
+
+    /** Live state from liveConnect: whether a Studio session is connected + its module ids. */
+    setRobotLive({ connected, ids } = {}) {
+        if (connected !== undefined) this._rcConnected = !!connected;
+        if (ids !== undefined) this._rcLiveIds = ids;
+        this._rcRender();
+    }
+
+    _rcSelectedPreset() {
+        const i = parseInt(this._rcSelect.value, 10);
+        return Number.isInteger(i) ? this._rcPresets[i] : null;
+    }
+
+    _rcStatus(text, color = '#9da7b3') {
+        if (this._rcTxt) { this._rcTxt.textContent = text; this._rcDot.style.cssText = dot(color); }
+    }
+
+    _rcRender() {
+        const hasSession = !!this.app._robflowSocket;
+        const matched = this._rcLiveIds ? matchPreset(this._rcLiveIds, this._rcPresets) : null;
+        if (!hasSession) {
+            this._rcStatus('Offline — Apply builds the robot locally');
+        } else if (!this._rcLiveIds || !this._rcLiveIds.length) {
+            this._rcStatus(this._rcConnected ? 'Studio — no robot reported yet' : 'Studio reconnecting…', '#d29922');
+        } else if (matched) {
+            const bits = [`${matched.dof}-DoF`];
+            if (matched.reachM != null) bits.push(`${matched.reachM.toFixed(2)} m`);
+            if (matched.payloadKg != null) bits.push(`${matched.payloadKg} kg`);
+            this._rcStatus(`Studio: ${matched.englishName} · ${bits.join(' · ')}`, '#3fb950');
+            // Reflect the applied config in the dropdown only when it actually changes.
+            const key = matched.idsPadded.join(',');
+            if (key !== this._rcSyncedKey) { this._rcSyncedKey = key; this._rcSelect.value = String(this._rcPresets.indexOf(matched)); }
+        } else {
+            this._rcStatus(`Studio: custom (${this._rcLiveIds.length} modules)`, '#d29922');
+            this._rcSyncedKey = null;
+        }
+        this._rcApplyBtn.textContent = hasSession ? 'Apply to Studio' : 'Load in viewer';
+        this._rcRenderDetail();
+    }
+
+    _rcRenderDetail() {
+        const p = this._rcSelectedPreset();
+        this._rcDetail.textContent = p ? p.buildOrder : '';
+    }
+
+    async _rcApply() {
+        const p = this._rcSelectedPreset();
+        if (!p) { this._rcStatus('pick a robot from the list first', '#d29922'); return; }
+
+        if (this.app._robflowSocket) {
+            if (!this.app._robcoApplyModules) { this._rcStatus('reconnect with your account token to apply', '#d29922'); return; }
+            this._rcApplyBtn.disabled = true;
+            this._rcStatus(`applying ${p.englishName} to Studio…`, '#2f81f7');
+            try {
+                // POST /public/virtual-robot/configure — Studio streams new robotModuleIds and the mirror rebuilds.
+                await this.app._robcoApplyModules(p.idsRaw);
+                this._rcStatus(`applied ${p.englishName} — Studio reconfiguring…`, '#3fb950');
+            } catch (e) {
+                const hint = /\b401\b/.test(e.message) ? ' (account token expired — reconnect)' : '';
+                this._rcStatus(`apply failed: ${e.message}${hint}`, '#f85149');
+            } finally {
+                this._rcApplyBtn.disabled = false;
+            }
+            return;
+        }
+
+        // Offline: build the robot locally from the public module CDN.
+        this._rcApplyBtn.disabled = true;
+        this._rcStatus(`building ${p.englishName}…`, '#2f81f7');
+        try {
+            const { buildStaticRobco } = await import('./robcoBuild.js');
+            await buildStaticRobco(this.app, { baseUrl: MODULES_CDN, moduleIds: p.idsPadded });
+            this._rcStatus(`loaded ${p.englishName}`, '#3fb950');
+        } catch (e) {
+            this._rcStatus(`build failed: ${e.message}`, '#f85149');
+            console.error('[RobCo] offline robot build failed:', e);
+        } finally {
+            this._rcApplyBtn.disabled = false;
         }
     }
 

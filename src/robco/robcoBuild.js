@@ -48,9 +48,17 @@ export async function buildStaticRobco(app, { baseUrl, moduleIds, anglesDeg = nu
     try {
         const { TeachPendant } = await import('./TeachPendant.js');
         const { RobFlowToolsPanel } = await import('./RobFlowToolsPanel.js');
+        // Dispose a prior teach (TeachPendant.attach isn't idempotent) so repeated static builds —
+        // e.g. loading different sample robots from the Robot Config panel — don't leak a gizmo /
+        // MuJoCo kinematics instance.
+        try { window._robcoTeach?.dispose?.(); } catch { /* ignore */ }
         teach = await TeachPendant.attach(app, model);
         window._robcoTeach = teach;
-        window._robcoPanel = new RobFlowToolsPanel(app, { teach, client: null });
+        // Reuse the existing tools panel across rebuilds (e.g. loading another sample robot from its
+        // Robot Config section) — otherwise each build would stack a duplicate panel and reset the
+        // section. Just re-point its teach engine.
+        if (window._robcoPanel) window._robcoPanel.setTeach(teach);
+        else window._robcoPanel = new RobFlowToolsPanel(app, { teach, client: null });
         // Dragging the gizmo -> recompute the dynamics panel for the posed arm.
         if (teach) teach.onPose = (deg) => window._robcoDynamics?.updateStatic?.(deg);
 

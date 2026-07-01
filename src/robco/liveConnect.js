@@ -16,6 +16,7 @@ import { applyAnglesDeg } from './poseUtils.js';
 import { DynamicsController } from '../dynamics/DynamicsController.js';
 import { TeachPendant } from './TeachPendant.js';
 import { RobFlowToolsPanel } from './RobFlowToolsPanel.js';
+import { canonicalIds } from './robotPresets.js';
 import { saveSession, saveToken } from './sessionStore.js';
 
 const redactSid = (url) => url.replace(/session\/ws\/[^/]+/, 'session/ws/<SID>');
@@ -40,8 +41,30 @@ export async function connectLiveSession(app, opts) {
             console.warn('[RobCo] editor login failed — push/save disabled (read + move still work):', e.message);
         }
     }
-    const panel = new RobFlowToolsPanel(app, { client });
+    const panel = new RobFlowToolsPanel(app, { client }); // Status + Robot Config + Teach; two-way sync
     const socket = new RobFlowSocket(session.wsUrl);
+
+    // Reconfiguring the virtual robot's modules is an account-level REST POST to
+    // /public/virtual-robot/configure (the /robot WS is read-only for this — a `module_ids` frame
+    // there is silently dropped). Authorized by the Cognito account token, NOT the session editor
+    // token. Cloud only; needs a token (view-only sessions can't reconfigure). The panel's Robot
+    // Config section calls this on Apply; the session then streams new robotModuleIds and the mirror rebuilds.
+    if (session.mode === 'cloud' && opts.token) {
+        const publicBase = session.restBase.split('/virtual-robot/session/')[0]; // https://<host>/public
+        const configureUrl = `${publicBase}/virtual-robot/configure`;
+        app._robcoApplyModules = async (moduleIds) => {
+            const res = await fetch(configureUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${opts.token}` },
+                credentials: 'omit',
+                body: JSON.stringify({ type: 'module_ids', module_ids: moduleIds }),
+            });
+            if (!res.ok) throw new Error(`configure → HTTP ${res.status}`);
+            return res.status;
+        };
+    } else {
+        app._robcoApplyModules = null;
+    }
 
     // Stream-rate meter: timestamp every frame off the socket (with event.timeStamp), measure
     // the jointAngles push cadence. Tap is passive — never touches the per-type handlers.
@@ -56,6 +79,8 @@ export async function connectLiveSession(app, opts) {
     app._robcoCycleTimer = cycleTimer;
     let model = null;
     let building = false;
+    let currentCanonical = null; // canonical module-id list the viewer is currently built for
+    let pendingIds = null;       // a config change that arrived mid-rebuild (coalesced)
     let latestAngles = null;
     let latestBaseShift = null;
     let dynamics = null;
@@ -102,63 +127,82 @@ export async function connectLiveSession(app, opts) {
         else { pendingRobotPayload = info; havePendingRobot = true; }
     };
 
-    socket.on('robotModuleIds', async (ids) => {
-        if (model || building) return; // build once; rebuild-on-change can come later
+    // Build the arm from a module-id list and (re)wire the full toolset. Called for the first
+    // build and for every subsequent config change (full mirror). Assigns the closure vars
+    // `model`/`dynamics`/`teach`.
+    async function buildAndWire(ids) {
+        console.log(`[RobCo] building live robot from ${ids.length} module ids`);
+        model = await RobCoModuleAdapter.build({ baseUrl: session.modulesBase, moduleIds: ids });
+        app.fileHandler.onModelLoaded(model, { name: 'robco-live.robco' }); // disposes the old model
+        if (latestAngles) applyAnglesDeg(model, latestAngles);
+        console.log(`[RobCo] live robot ready: ${model.links.size} links, ${model.joints.size} joints`);
+        try {
+            const { enhanceVisuals } = await import('./enhanceVisuals.js');
+            await enhanceVisuals(model, app.sceneManager);
+        } catch (e) { console.warn('[RobCo] enhanceVisuals failed:', e); }
+
+        // enhanceVisuals created the BaseFrame; apply any base shift the robot reported.
+        if (latestBaseShift) window._robcoBaseFrame?.setBaseShiftWS(latestBaseShift);
+
+        // Live dynamics dashboard (torque/utilization each frame).
+        try {
+            dynamics = await DynamicsController.attach(model); // disposes any prior controller
+            window._robcoDynamics = dynamics; // used by View-panel sliders + end-effector payload
+            if (dynamics && havePendingRobot) dynamics.applyRobotPayload(pendingRobotPayload);
+            if (dynamics && latestAngles) dynamics.update(latestAngles, performance.now());
+        } catch (e) {
+            console.error('[RobCo] dynamics dashboard failed:', e);
+        }
+
+        // Teach pendant (drag gizmo -> IK preview). Pauses the mirror while teaching.
+        try {
+            teach = await TeachPendant.attach(app, model);
+            window._robcoTeach = teach;
+            panel.setTeach(teach);
+            // While posing with the gizmo, the dynamics panel follows the previewed pose.
+            if (teach) teach.onPose = (deg) => dynamics?.updateStatic(deg);
+
+            // Waypoints (capture / load flow / reorder / go-to) — world-frame, base-relative.
+            if (teach && window._robcoBaseFrame) {
+                const { WaypointStore } = await import('./waypointStore.js');
+                const { WaypointsPanel } = await import('./WaypointsPanel.js');
+                const store = WaypointStore.ensure(app.sceneManager, window._robcoBaseFrame);
+                WaypointsPanel.ensure({ app, teach, base: window._robcoBaseFrame, store, client, cycleTimer });
+                const { EndEffector } = await import('./EndEffector.js');
+                EndEffector.ensure({ sm: app.sceneManager, model, teach, setupPanel: window._robcoSetupPanel });
+                const { TcpTrace } = await import('./TcpTrace.js');
+                TcpTrace.ensure({ sm: app.sceneManager, model, teach });
+            }
+        } catch (e) {
+            console.error('[RobCo] teach pendant failed:', e);
+        }
+    }
+
+    // Rebuild the viewer to match a module-id list (full two-way mirror). No-op if unchanged;
+    // coalesces changes that arrive mid-rebuild so we always converge on the latest.
+    async function rebuildTo(ids) {
+        const canon = canonicalIds(ids).join(',');
+        if (!canon || canon === currentCanonical) return;
+        if (building) { pendingIds = ids; return; }
         building = true;
         try {
-            console.log(`[RobCo] building live robot from ${ids.length} module ids`);
-            model = await RobCoModuleAdapter.build({
-                baseUrl: session.modulesBase,
-                moduleIds: ids,
-            });
-            app.fileHandler.onModelLoaded(model, { name: 'robco-live.robco' });
-            if (latestAngles) applyAnglesDeg(model, latestAngles);
-            console.log(
-                `[RobCo] live robot ready: ${model.links.size} links, ${model.joints.size} joints`,
-            );
-            try {
-                const { enhanceVisuals } = await import('./enhanceVisuals.js');
-                await enhanceVisuals(model, app.sceneManager);
-            } catch (e) { console.warn('[RobCo] enhanceVisuals failed:', e); }
-
-            // enhanceVisuals created the BaseFrame; apply any base shift the robot reported.
-            if (latestBaseShift) window._robcoBaseFrame?.setBaseShiftWS(latestBaseShift);
-
-            // Live dynamics dashboard (torque/utilization each frame).
-            try {
-                dynamics = await DynamicsController.attach(model);
-                window._robcoDynamics = dynamics; // used by View-panel sliders + end-effector payload
-                if (dynamics && havePendingRobot) dynamics.applyRobotPayload(pendingRobotPayload);
-                if (dynamics && latestAngles) dynamics.update(latestAngles, performance.now());
-            } catch (e) {
-                console.error('[RobCo] dynamics dashboard failed:', e);
-            }
-
-            // Teach pendant (drag gizmo -> IK preview). Pauses the mirror while teaching.
-            try {
-                teach = await TeachPendant.attach(app, model);
-                panel.setTeach(teach);
-                // While posing with the gizmo, the dynamics panel follows the previewed pose.
-                if (teach) teach.onPose = (deg) => dynamics?.updateStatic(deg);
-
-                // Waypoints (capture / load flow / reorder / go-to) — world-frame, base-relative.
-                if (teach && window._robcoBaseFrame) {
-                    const { WaypointStore } = await import('./waypointStore.js');
-                    const { WaypointsPanel } = await import('./WaypointsPanel.js');
-                    const store = WaypointStore.ensure(app.sceneManager, window._robcoBaseFrame);
-                    WaypointsPanel.ensure({ app, teach, base: window._robcoBaseFrame, store, client, cycleTimer });
-                    const { EndEffector } = await import('./EndEffector.js');
-                    EndEffector.ensure({ sm: app.sceneManager, model, teach, setupPanel: window._robcoSetupPanel });
-                    const { TcpTrace } = await import('./TcpTrace.js');
-                    TcpTrace.ensure({ sm: app.sceneManager, model, teach });
-                }
-            } catch (e) {
-                console.error('[RobCo] teach pendant failed:', e);
-            }
+            // Tear down the previous arm's teach before rebuilding (dynamics.attach + the ensure()
+            // singletons repoint themselves; onModelLoaded disposes the old mesh).
+            if (teach) { try { teach.dispose(); } catch { /* ignore */ } teach = null; }
+            model = null;
+            await buildAndWire(ids);
+            currentCanonical = canon;
         } catch (err) {
             console.error('[RobCo] live build failed:', err);
+        } finally {
             building = false;
         }
+        if (pendingIds) { const next = pendingIds; pendingIds = null; rebuildTo(next); }
+    }
+
+    socket.on('robotModuleIds', (ids) => {
+        panel.setRobotLive({ connected: true, ids });
+        rebuildTo(ids);
     });
 
     socket.on('jointAngles', (angles) => {
@@ -224,6 +268,7 @@ export async function connectLiveSession(app, opts) {
     socket.on('safetyState', (d) => panel.setStates({ safetyState: d }));
     socket.onStatus((state) => {
         panel.setWs(state === 'open');
+        panel.setRobotLive({ connected: state === 'open' });
         // Don't average a connection gap into the rate; resume cleanly on (re)connect.
         meter.breakGap();
         if (state === 'open') {

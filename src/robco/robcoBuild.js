@@ -72,6 +72,8 @@ export async function buildStaticRobco(app, { baseUrl, moduleIds, anglesDeg = nu
             EndEffector.ensure({ sm: app.sceneManager, model, teach, setupPanel: window._robcoSetupPanel });
             const { TcpTrace } = await import('./TcpTrace.js');
             TcpTrace.ensure({ sm: app.sceneManager, model, teach });
+            const { CameraView } = await import('./CameraView.js');
+            CameraView.ensure({ sm: app.sceneManager, model, teach });
         }
     } catch (e) {
         console.error('[RobCo] teach tools failed:', e);

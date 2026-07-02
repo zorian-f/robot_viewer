@@ -154,8 +154,10 @@ export class BlenderExport {
         this.samples.push({ t: performance.now() - this._startT, jq, rp, rq });
         if (this.samples.length >= MAX_SAMPLES) {
             this._capped = true;
-            this._stop();
+            this._stop();               // refreshes
+            return;
         }
+        this._refresh();                // live-update the time/keys readout
     }
 
     _clear() {

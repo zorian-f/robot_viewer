@@ -4,12 +4,13 @@
  * What a session captures:
  *   • the robot          — as a lightweight descriptor {baseUrl, moduleIds, anglesDeg}; rebuilt
  *                          from the RobCo module CDN on load (no module GLB bytes embedded).
- *   • imported GLBs       — the end-effector tool + the background scene GLB (and a custom IBL
- *                          EXR/HDRI, if any) are embedded as base64, since they are user-supplied
- *                          and have no URL to re-fetch from.
- *   • everything else     — base pose, waypoints, end-effector config, render look, environment
- *                          source, camera + orbit target, view toggles, dynamics payload — most
- *                          of which already self-persists to localStorage; we snapshot those keys.
+ *   • imported GLBs       — every end-effector tool, gripped material, and scene object (and a
+ *                          custom IBL EXR/HDRI, if any) are embedded as base64, since they are
+ *                          user-supplied and have no URL to re-fetch from.
+ *   • everything else     — base pose, waypoints, end-effector/material/scene-object configs,
+ *                          render look, environment source, camera + orbit target, view toggles,
+ *                          dynamics payload — most of which already self-persists to localStorage;
+ *                          we snapshot those keys.
  *
  * RESTORE STRATEGY: write the saved localStorage keys FIRST, then run the normal static build
  * (buildStaticRobco) — the RobCo panels auto-restore base pose / render / waypoints / tool config
@@ -32,8 +33,9 @@ export const VERSION = 1;
 const LS_KEYS = [
     'robco-base-pose',
     'robco-render-settings-v6',
-    'robco-endeffector',
-    'robco-scene-transform',
+    'robco-endeffectors',
+    'robco-materials',
+    'robco-scene-objects',
     'robco-waypoints',
     'robco-tcp-payload',
     'robco-dyn-motormodel',
@@ -147,6 +149,7 @@ export function captureSession(app) {
     }
 
     const ee = window._robcoEndEffector;
+    const mat = window._robcoMaterialManager;
     const setup = window._robcoSetupPanel;
     const render = window._robcoRenderPanel;
     const view = window._robcoViewPanel;
@@ -169,8 +172,9 @@ export function captureSession(app) {
         },
         localStorage: captureLocalStorage(),
         assets: {
-            endEffectorGlb: asset(ee?._fileBytes, ee?._fileName),
-            sceneGlb: asset(setup?._sceneBytes, setup?._sceneFileName),
+            endEffectors: (ee?.tools || []).map((t) => asset(t.bytes, t.fileName)).filter(Boolean),
+            materials: (mat?.items || []).map((it) => asset(it.bytes, it.fileName)).filter(Boolean),
+            sceneObjects: (setup?.sceneObjects?.items || []).map((it) => asset(it.bytes, it.fileName)).filter(Boolean),
             envMap: render?._envSource === 'custom' ? asset(render?._envBytes, render?._envFileName) : null,
         },
     };
@@ -180,7 +184,8 @@ export function captureSession(app) {
 /** Rough byte size of a session's embedded assets (for a UI warning). */
 export function assetsBytes(session) {
     const a = session?.assets || {};
-    return Object.values(a).reduce((s, x) => s + (x?.b64 ? Math.floor(x.b64.length * 0.75) : 0), 0);
+    const size = (x) => (x?.b64 ? Math.floor(x.b64.length * 0.75) : 0);
+    return Object.values(a).reduce((s, x) => s + (Array.isArray(x) ? x.reduce((s2, y) => s2 + size(y), 0) : size(x)), 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -242,15 +247,28 @@ export async function restoreSession(app, session) {
         console.warn('[RobCo] session has no RobCo robot descriptor — restoring scene state only');
     }
 
-    // 4) Re-import the embedded GLB/EXR assets (these need the raw bytes).
+    // 4) Re-import the embedded GLB/EXR assets (these need the raw bytes). Each manager's own
+    //    _loadPersisted() already consumed the matching config (name/transform/mass/...) from the
+    //    localStorage seeded in step 1, so addFromFile() re-applies it as each asset loads, in the
+    //    same order it was saved.
     const A = session.assets || {};
-    if (A.endEffectorGlb && window._robcoEndEffector) {
-        try { await window._robcoEndEffector.load(b64ToFile(A.endEffectorGlb)); }
-        catch (e) { console.warn('[RobCo] end-effector restore failed:', e); }
+    if (window._robcoEndEffector) {
+        for (const a of A.endEffectors || []) {
+            try { await window._robcoEndEffector.addFromFile(b64ToFile(a)); }
+            catch (e) { console.warn('[RobCo] end-effector restore failed:', e); }
+        }
     }
-    if (A.sceneGlb && window._robcoSetupPanel) {
-        try { await window._robcoSetupPanel._loadScene(b64ToFile(A.sceneGlb)); }
-        catch (e) { console.warn('[RobCo] scene GLB restore failed:', e); }
+    if (window._robcoMaterialManager) {
+        for (const a of A.materials || []) {
+            try { await window._robcoMaterialManager.addFromFile(b64ToFile(a)); }
+            catch (e) { console.warn('[RobCo] material restore failed:', e); }
+        }
+    }
+    if (window._robcoSetupPanel?.sceneObjects) {
+        for (const a of A.sceneObjects || []) {
+            try { await window._robcoSetupPanel.sceneObjects.addFromFile(b64ToFile(a)); }
+            catch (e) { console.warn('[RobCo] scene object restore failed:', e); }
+        }
     }
     if (session.env?.source === 'custom' && A.envMap && window._robcoRenderPanel) {
         try { await window._robcoRenderPanel._loadEnvFile(b64ToFile(A.envMap)); }

@@ -12,7 +12,12 @@
  * with `onlyVisible:true`, which naturally drops the visibility-gated collision/CoM/frame helpers;
  * the TCP-trace line (the one visible non-robot child of the root) is hidden for the export.
  *
- * Note: glTF is Y-up — Blender's importer converts to Z-up on import.
+ * Up-axis: the viewer keeps the robot in its native Z-up frame (SceneManager.world applies a
+ * −90°X rotation purely for display), while glTF is Y-up. By default the export therefore wraps
+ * the robot in a −90°X group so Blender's importer (Y-up→Z-up) lands it upright; untick
+ * "Z-up (Blender)" to export the raw viewer frame instead. The conversion lives on the wrapper —
+ * not the root — because the clip's root quaternion track would overwrite a static rotation on
+ * the root itself at playback.
  */
 import * as THREE from 'three';
 import { makeDraggable, makeCollapsible } from './draggable.js';
@@ -71,9 +76,11 @@ export class BlenderExport {
         this._capped = false;
         this._busy = false;       // export in flight
         this.fps = DEFAULT_FPS;
+        this.zUp = true;              // pre-rotate export so the robot stands upright in Blender
         try {
             const saved = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
             if (FPS_CHOICES.includes(saved.fps)) this.fps = saved.fps;
+            if (typeof saved.zUp === 'boolean') this.zUp = saved.zUp;
         } catch { /* ignore */ }
         this._build();
         this._refresh();
@@ -109,7 +116,7 @@ export class BlenderExport {
     }
 
     _persist() {
-        try { localStorage.setItem(LS_KEY, JSON.stringify({ fps: this.fps })); } catch { /* ignore */ }
+        try { localStorage.setItem(LS_KEY, JSON.stringify({ fps: this.fps, zUp: this.zUp })); } catch { /* ignore */ }
     }
 
     // --- Recording ---------------------------------------------------------
@@ -204,13 +211,29 @@ export class BlenderExport {
         const traceWasVisible = trace ? trace.visible : false;
         if (trace) trace.visible = false;
 
+        // Z-up: reparent the root under a −90°X group for the duration of the export, so the
+        // Z-up robot data becomes Y-up per the glTF spec and Blender's importer re-erects it.
+        // The wrapper joins sm.scene (same net transform as sm.world's display conversion), so
+        // the robot stays visibly in place while the exporter's async passes run.
+        let wrap = null;
+        let prevParent = null;
+        if (this.zUp) {
+            wrap = new THREE.Group();
+            wrap.name = 'ZUp';
+            wrap.rotation.x = -Math.PI / 2;
+            prevParent = root.parent;
+            this.sm?.scene?.add(wrap);
+            wrap.add(root);
+            wrap.updateMatrixWorld(true);
+        }
+
         try {
             const clip = this._buildClip();
             const { GLTFExporter } = await import('three/examples/jsm/exporters/GLTFExporter.js');
             const exporter = new GLTFExporter();
             const buffer = await new Promise((resolve, reject) => {
                 exporter.parse(
-                    root,
+                    wrap || root,
                     (gltf) => resolve(gltf),
                     (err) => reject(err),
                     { binary: true, onlyVisible: true, animations: [clip] },
@@ -224,6 +247,12 @@ export class BlenderExport {
             this._status.textContent = `export failed: ${e?.message || e}`;
             this._status.style.color = '#f85149';
         } finally {
+            if (wrap) {
+                if (prevParent) prevParent.add(root);
+                else wrap.remove(root);
+                wrap.removeFromParent();
+                prevParent?.updateMatrixWorld(true);
+            }
             if (trace) trace.visible = traceWasVisible;
             this._busy = false;
             this._refresh();
@@ -270,6 +299,18 @@ export class BlenderExport {
         fpsRow.append(this._fpsSel);
         body.append(fpsRow);
 
+        const zRow = el('label', 'display:flex;gap:6px;align-items:center;margin-top:6px;color:#9da7b3;cursor:pointer;');
+        this._zUpChk = el('input');
+        this._zUpChk.type = 'checkbox';
+        this._zUpChk.style.cssText = 'margin:0;accent-color:#3fb950;';
+        this._zUpChk.checked = this.zUp;
+        this._zUpChk.addEventListener('change', () => {
+            this.zUp = this._zUpChk.checked;
+            this._persist();
+        });
+        zRow.append(this._zUpChk, el('span', null, 'Z-up (upright in Blender)'));
+        body.append(zRow);
+
         this._exportBtn = el('button', BTN + 'width:100%;margin-top:8px;', 'Export .glb');
         this._exportBtn.addEventListener('click', () => this._export());
         body.append(this._exportBtn);
@@ -278,7 +319,8 @@ export class BlenderExport {
         body.append(this._status);
 
         body.append(el('div', 'font-size:10px;color:#6e7681;margin-top:6px;',
-            'Records the arm’s motion (incl. the live stream). Import the .glb in Blender: File → Import → glTF 2.0. (glTF is Y-up; Blender converts.)'));
+            'Records the arm’s motion (incl. the live stream). Import in Blender: File → Import → glTF 2.0. ' +
+            'Z-up pre-rotates the export so the robot stands upright in Blender; untick to keep the viewer’s native axes.'));
 
         makeCollapsible(body, minBtn, 'blender');
         document.body.appendChild(root);

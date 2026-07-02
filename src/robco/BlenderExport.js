@@ -11,6 +11,9 @@
  * GLTFExporter), so we never rename the live scene nodes. Export runs on `model.threeObject`
  * with `onlyVisible:true`, which naturally drops the visibility-gated collision/CoM/frame helpers;
  * the TCP-trace line (the one visible non-robot child of the root) is hidden for the export.
+ * A loaded end-effector tool hangs off the flange (a visible child of the robot), so it is
+ * included automatically — we just re-assert its attachment first in case a live rebuild
+ * orphaned it on a stale model.
  *
  * Up-axis: the viewer keeps the robot in its native Z-up frame (SceneManager.world applies a
  * −90°X rotation purely for display), while glTF is Y-up. By default the export therefore wraps
@@ -206,6 +209,11 @@ export class BlenderExport {
         if (this._busy || this.recording || !root || this.samples.length < 2) return;
         this._busy = true;
         this._refresh();
+
+        // Make sure a loaded end-effector tool is parented to the current flange (a live rebuild
+        // can leave it on a stale model) so it's part of the exported subtree — it rides along as
+        // a visible child of the flange node, following the baked joint motion in Blender.
+        window._robcoEndEffector?.reattach?.();
 
         // Hide the TCP-trace polyline (the only visible non-robot child of the root) so it isn't
         // baked into the mesh export; restore afterwards.

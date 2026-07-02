@@ -38,6 +38,7 @@ const LS_KEYS = [
     'robco-tcp-payload',
     'robco-dyn-motormodel',
     'robco-dyn-settings',
+    'robco-dock-layout-v1',
 ];
 
 // ---------------------------------------------------------------------------
